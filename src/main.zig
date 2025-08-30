@@ -1,6 +1,7 @@
 const sdl = @import("sdl3");
 const std = @import("std");
 
+const input = @import("input.zig");
 const Level1 = @import("level1/level1.zig").Level1;
 
 const screen_width = 800;
@@ -27,6 +28,9 @@ pub fn main() !void {
     defer window.deinit();
 
     const alloc = std.heap.smp_allocator;
+    input.handler = .init(alloc);
+    input.handler = .init(alloc);
+    defer input.handler.deinit();
 
     var display = try sdl.video.Display.getPrimaryDisplay();
     const modes = try display.getFullscreenModes(alloc);
@@ -41,45 +45,42 @@ pub fn main() !void {
     var level = try Level1.init(alloc);
     defer level.deinit();
 
-    var running = true;
-    while (running) {
+    const level_surface = try sdl.surface.Surface.init(
+        screen_width,
+        screen_height,
+        .packed_xrgb_8_8_8_8,
+    );
 
-        // Delay to limit the FPS, returned delta time not needed.
+    const scale = 3.0;
+
+    while (true) {
+        // Delay to limit the FPS
         const dt = fps_capper.delay();
+
+        while (sdl.events.poll()) |event| {
+            switch (event) {
+                .key_up, .key_down => |e| try input.handler.update(e),
+                .quit, .terminating => break,
+                else => {},
+            }
+        }
+
+        if (input.handler.isPressed(.escape)) break;
 
         try level.update(dt);
 
         const surface = try window.getSurface();
 
-        const level_surface = try sdl.surface.Surface.init(
-            screen_width / 3,
-            screen_height / 3,
-            .packed_xrgb_8_8_8_8,
-        );
         try level_surface.fillRect(null, surface.mapRgb(100, 100, 100));
         try level.render(level_surface);
 
-        try level_surface.blitScaled(null, surface, null, .nearest);
-
-        try surface.fillRect(.{
-            .x = 400,
-            .y = 300,
-            .w = 1,
-            .h = 1,
-        }, .{ .value = 999999 });
+        try level_surface.blitScaled(null, surface, .{
+            .x = (screen_width * 0.5) * -(scale - 1.0),
+            .y = (screen_height * 0.5) * -(scale - 1.0),
+            .w = screen_width * scale,
+            .h = screen_height * scale,
+        }, .nearest);
 
         try window.updateSurface();
-
-        while (sdl.events.poll()) |event| {
-            switch (event) {
-                .key_down => |e| {
-                    if (e.key) |key| if (key == .escape) {
-                        running = false;
-                    };
-                },
-                .quit, .terminating => running = false,
-                else => {},
-            }
-        }
     }
 }

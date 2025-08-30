@@ -5,12 +5,17 @@ const sdl = @import("sdl3");
 const Surface = sdl.surface.Surface;
 const Point = sdl.rect.Point(f32);
 
+const input = @import("input.zig");
+const Vector = @import("vector.zig").Vector;
+
+const max_speed = 65.0;
+
 pub const Player = struct {
     pub const Self = @This();
 
     alloc: Allocator,
 
-    loc: Point = .{ .x = 133, .y = 100 },
+    loc: Point = .{ .x = 400, .y = 300 },
     image: Surface,
     half_image_size: Point = undefined,
 
@@ -31,10 +36,17 @@ pub const Player = struct {
     }
 
     pub fn update(self: *Self, dt: f32) !void {
-        _ = self;
-        _ = dt;
-        // self.loc.x += 1 * dt * 10;
-        // self.loc.y += 1 * dt * 10;
+        var vel: Vector = .{};
+        if (input.handler.isPressed(.left)) vel.x -= max_speed;
+        if (input.handler.isPressed(.right)) vel.x += max_speed;
+
+        if (input.handler.isPressed(.up)) vel.y -= max_speed;
+        if (input.handler.isPressed(.down)) vel.y += max_speed;
+
+        vel = vel.maxMagnitude(max_speed);
+
+        self.loc.x += vel.x * dt;
+        self.loc.y += vel.y * dt;
     }
 
     pub fn render(self: *Self, ctx: Surface) !void {

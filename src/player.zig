@@ -5,7 +5,7 @@ const sdl = @import("sdl3");
 const Surface = sdl.surface.Surface;
 const Point = sdl.rect.Point(f32);
 
-const input = @import("input.zig");
+const Input = @import("input.zig");
 const Vector = @import("vector.zig").Vector;
 
 const max_speed = 65.0;
@@ -37,11 +37,11 @@ pub const Player = struct {
 
     pub fn update(self: *Self, dt: f32) !void {
         var vel: Vector = .{};
-        if (input.handler.isPressed(.left)) vel.x -= max_speed;
-        if (input.handler.isPressed(.right)) vel.x += max_speed;
+        if (Input.isPressed(.left)) vel.x -= max_speed;
+        if (Input.isPressed(.right)) vel.x += max_speed;
 
-        if (input.handler.isPressed(.up)) vel.y -= max_speed;
-        if (input.handler.isPressed(.down)) vel.y += max_speed;
+        if (Input.isPressed(.up)) vel.y -= max_speed;
+        if (Input.isPressed(.down)) vel.y += max_speed;
 
         vel = vel.maxMagnitude(max_speed);
 

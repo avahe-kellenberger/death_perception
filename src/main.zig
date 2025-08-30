@@ -1,14 +1,18 @@
 const sdl = @import("sdl3");
 const std = @import("std");
 
-const input = @import("input.zig");
 const Level1 = @import("level1/level1.zig").Level1;
+
+const Input = @import("input.zig");
 
 const screen_width = 800;
 const screen_height = 600;
 
 pub fn main() !void {
     defer sdl.shutdown();
+
+    Input.init(std.heap.smp_allocator);
+    defer Input.deinit();
 
     // Initialize SDL with subsystems you need here.
     const init_flags = sdl.InitFlags{
@@ -28,9 +32,6 @@ pub fn main() !void {
     defer window.deinit();
 
     const alloc = std.heap.smp_allocator;
-    input.handler = .init(alloc);
-    input.handler = .init(alloc);
-    defer input.handler.deinit();
 
     var display = try sdl.video.Display.getPrimaryDisplay();
     const modes = try display.getFullscreenModes(alloc);
@@ -59,13 +60,13 @@ pub fn main() !void {
 
         while (sdl.events.poll()) |event| {
             switch (event) {
-                .key_up, .key_down => |e| try input.handler.update(e),
+                .key_up, .key_down => |e| try Input.update(e),
                 .quit, .terminating => break,
                 else => {},
             }
         }
 
-        if (input.handler.isPressed(.escape)) break;
+        if (Input.isPressed(.escape)) break;
 
         try level.update(dt);
 

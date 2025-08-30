@@ -1,27 +1,85 @@
+const sdl = @import("sdl3");
 const std = @import("std");
-const shade = @import("shade");
+
+const Level1 = @import("level1/level1.zig").Level1;
+
+const screen_width = 800;
+const screen_height = 600;
 
 pub fn main() !void {
-    // Prints to stderr, ignoring potential errors.
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
-    try shade.bufferedPrint();
-}
+    defer sdl.shutdown();
 
-test "simple test" {
-    const gpa = std.testing.allocator;
-    var list: std.ArrayList(i32) = .empty;
-    defer list.deinit(gpa); // Try commenting this out and see if zig detects the memory leak!
-    try list.append(gpa, 42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
-}
-
-test "fuzz example" {
-    const Context = struct {
-        fn testOne(context: @This(), input: []const u8) anyerror!void {
-            _ = context;
-            // Try passing `--fuzz` to `zig build test` and see if it manages to fail this test case!
-            try std.testing.expect(!std.mem.eql(u8, "canyoufindme", input));
-        }
+    // Initialize SDL with subsystems you need here.
+    const init_flags = sdl.InitFlags{
+        .video = true,
+        .joystick = true,
+        .gamepad = true,
     };
-    try std.testing.fuzz(Context{}, Context.testOne, .{});
+    try sdl.init(init_flags);
+    defer sdl.quit(init_flags);
+
+    const window = try sdl.video.Window.init(
+        "Death Perception",
+        screen_width,
+        screen_height,
+        .{},
+    );
+    defer window.deinit();
+
+    const alloc = std.heap.smp_allocator;
+
+    var display = try sdl.video.Display.getPrimaryDisplay();
+    const modes = try display.getFullscreenModes(alloc);
+    defer alloc.free(modes);
+
+    const refresh_rate: usize = if (modes[0].refresh_rate) |rr| @intFromFloat(rr) else 60;
+
+    var fps_capper = sdl.extras.FramerateCapper(f32){ .mode = .{ .limited = refresh_rate } };
+
+    std.log.info("FPS set to {}", .{refresh_rate});
+
+    var level = try Level1.init(alloc);
+    defer level.deinit();
+
+    var running = true;
+    while (running) {
+
+        // Delay to limit the FPS, returned delta time not needed.
+        const dt = fps_capper.delay();
+
+        try level.update(dt);
+
+        const surface = try window.getSurface();
+
+        const level_surface = try sdl.surface.Surface.init(
+            screen_width / 3,
+            screen_height / 3,
+            .packed_xrgb_8_8_8_8,
+        );
+        try level_surface.fillRect(null, surface.mapRgb(100, 100, 100));
+        try level.render(level_surface);
+
+        try level_surface.blitScaled(null, surface, null, .nearest);
+
+        try surface.fillRect(.{
+            .x = 400,
+            .y = 300,
+            .w = 1,
+            .h = 1,
+        }, .{ .value = 999999 });
+
+        try window.updateSurface();
+
+        while (sdl.events.poll()) |event| {
+            switch (event) {
+                .key_down => |e| {
+                    if (e.key) |key| if (key == .escape) {
+                        running = false;
+                    };
+                },
+                .quit, .terminating => running = false,
+                else => {},
+            }
+        }
+    }
 }

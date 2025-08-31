@@ -3,6 +3,7 @@ const Allocator = std.mem.Allocator;
 const sdl = @import("sdl3");
 const rand = @import("random.zig").rand;
 const Array2D = @import("array_2d.zig").Array2D;
+const Spritesheet = @import("spritesheet.zig").Spritesheet;
 
 const Tile = struct {
     floor_image_index: isize = -1,
@@ -11,16 +12,24 @@ const Tile = struct {
     is_wall: bool,
 };
 
-pub fn Map(comptime width: usize, comptime height: usize) type {
+pub fn Map(
+    comptime width: usize,
+    comptime height: usize,
+    floor_sheet: Spritesheet(usize, usize),
+    wall_sheet: Spritesheet(usize, usize),
+) type {
     return struct {
         pub const Self = @This();
 
-        var floor_tile_sheet: sdl.surface.Surface = undefined;
-        var wall_tile_sheet: sdl.surface.Surface = undefined;
+        var floor_tiles_image: sdl.surface.Surface = undefined;
+        var wall_tiles_image: sdl.surface.Surface = undefined;
 
         alloc: Allocator,
         tiles: Array2D(Tile, width, height),
         tile_size: usize,
+
+        floor_tiles_sheet: Spritesheet(usize, usize) = floor_sheet,
+        wall_tiles_sheet: Spritesheet(usize, usize) = wall_sheet,
 
         pub fn init(
             alloc: Allocator,
@@ -28,8 +37,8 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
             density: f32,
             border_thickness: usize,
         ) !Map(width, height) {
-            floor_tile_sheet = try sdl.image.loadFile("./assets/images/floor_tiles.png");
-            wall_tile_sheet = try sdl.image.loadFile("./assets/images/wall_tiles.png");
+            floor_tiles_image = try sdl.image.loadFile("./assets/images/floor_tiles.png");
+            wall_tiles_image = try sdl.image.loadFile("./assets/images/wall_tiles.png");
 
             var result = Map(width, height){
                 .alloc = alloc,
@@ -57,8 +66,8 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
 
         pub fn deinit(self: *Self) void {
             _ = self;
-            floor_tile_sheet.deinit();
-            wall_tile_sheet.deinit();
+            floor_tiles_image.deinit();
+            wall_tiles_image.deinit();
         }
 
         fn processCellularAutoma(self: *Self) void {
@@ -176,11 +185,66 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
         }
 
         fn setupTileImages(self: *Self) void {
-            _ = self;
-            //
+            var iter = self.tiles.iterator();
+            while (iter.next()) |e| {
+                e.t.neighbor_bit_sum = self.calcNeighborBitsum(e.t.is_wall, e.x, e.y);
+                if (e.t.is_wall) {
+                    e.t.wall_image_index = switch (e.t.neighbor_bit_sum) {
+                        255 => 0,
+                        107, 111, 235 => 1,
+                        182, 183, 214, 215, 246 => 2,
+                        180, 212, 240, 244 => 3,
+                        248, 249, 252 => 4,
+                        105, 216, 217, 232, 233 => 5,
+                        22, 23, 54, 55, 150, 151 => 6,
+                        31, 63, 159 => 7,
+                        11, 15, 43, 47, 91, 95 => 8,
+                        127 => 9,
+                        191, 223 => 10,
+                        251 => 11,
+                        254 => 12,
+                        219 => 14,
+                        else => 0,
+                    };
+
+                    e.t.floor_image_index = switch (e.t.neighbor_bit_sum) {
+                        212, 232, 240, 244, 248, 249, 252 => 0,
+                        105, 233 => 3,
+                        else => -1,
+                    };
+                } else {
+                    e.t.floor_image_index = switch (e.t.neighbor_bit_sum) {
+                        104, 105, 232, 233, 248, 249, 252 => 2,
+                        22, 150, 214, 246 => 3,
+                        254 => 4,
+                        208, 212, 240, 244 => 5,
+                        else => 0,
+                    };
+                }
+            }
+        }
+
+        /// Calculates a bit sum based on all neighboring tiles:
+        ///
+        /// 0 1 0
+        /// 0 X 1
+        /// 1 0 0
+        ///
+        /// Where X is the local tile, and each 0 or 1 representing a neighboring tile.
+        /// 8 neighboring tiles = 8 bits of info, with a 1 representing a wall.
+        ///
+        fn calcNeighborBitsum(self: *Self, is_wall: bool, x: usize, y: usize) u8 {
+            var result: u8 = 0;
+            for (self.getMooreNeighborhood(x, y), 0..) |neighbor_is_wall, i| {
+                if (is_wall == neighbor_is_wall) {
+                    result += @shlExact(1, i);
+                }
+            }
+            return result;
         }
 
         fn getMooreNeighborhood(self: *Self, x: usize, y: usize) [9]bool {
+            // TODO: Can return a u8 here (bits) instead. Skip own tile
             var result: [9]bool = @splat(true);
 
             // Top row
@@ -208,7 +272,14 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
                 const tile_y = @as(f32, @floatFromInt(e.y * self.tile_size)) + offset_y;
 
                 if (e.t.floor_image_index >= 0) {
-                    // TODO: Tilesheets!
+                    const sprite_rect = self.wall_tiles_sheet.get(e.t.floor_image_index);
+                    const dest: sdl.rect.IRect(i32) = .{
+                        .x = @floor(tile_x + @as(f32, @floatFromInt(self.tile_size)) * 0.5),
+                        .y = @floor(tile_y + @as(f32, @floatFromInt(self.tile_size)) * 0.5),
+                        .w = sprite_rect.w,
+                        .h = sprite_rect.h,
+                    };
+                    try floor_tiles_image.blitScaled(sprite_rect, ctx, dest, .nearest);
                 }
             }
         }

@@ -88,3 +88,8 @@ pub fn main() !void {
         try window.updateSurface();
     }
 }
+
+test {
+    // Required for `zig build test` to find all tests in src
+    std.testing.refAllDecls(@This());
+}

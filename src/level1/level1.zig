@@ -3,6 +3,7 @@ const Allocator = std.mem.Allocator;
 
 const sdl = @import("sdl3");
 const Player = @import("../player.zig").Player;
+const Map = @import("../map.zig").Map;
 
 pub const Level1 = struct {
     pub const Self = @This();
@@ -10,11 +11,13 @@ pub const Level1 = struct {
     alloc: Allocator,
 
     player: Player,
+    map: Map(100, 100),
 
     pub fn init(alloc: Allocator) !Level1 {
         return .{
             .alloc = alloc,
             .player = try Player.init(alloc),
+            .map = try Map(100, 100).init(alloc, 32, 46.0, 4),
         };
     }
 

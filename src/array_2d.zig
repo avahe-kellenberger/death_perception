@@ -1,6 +1,6 @@
 const std = @import("std");
 
-pub fn Array2D(T: type, comptime width: u32, comptime height: u32) type {
+pub fn Array2D(T: type, comptime width: usize, comptime height: usize) type {
     return struct {
         pub const Self = @This();
 
@@ -10,12 +10,16 @@ pub fn Array2D(T: type, comptime width: u32, comptime height: u32) type {
             return .{};
         }
 
-        pub fn get(self: *Self, x: u32, y: u32) *T {
+        pub fn get(self: *Self, x: usize, y: usize) *T {
             return &self.values[width * y + x];
         }
 
+        pub fn set(self: *Self, x: usize, y: usize, t: T) void {
+            self.values[width * y + x] = t;
+        }
+
         /// Translates the coordinates into an index for direct access to `values`.
-        pub fn getIndex(_: *Self, x: u32, y: u32) u64 {
+        pub fn getIndex(_: *Self, x: usize, y: usize) u64 {
             return width * y + x;
         }
 
@@ -25,8 +29,8 @@ pub fn Array2D(T: type, comptime width: u32, comptime height: u32) type {
     };
 }
 
-fn Iterator(comptime T: type, comptime width: u32, comptime height: u32) type {
-    const Result = struct { t: *T, x: u32, y: u32 };
+fn Iterator(comptime T: type, comptime width: usize, comptime height: usize) type {
+    const Result = struct { t: *T, x: usize, y: usize };
 
     return struct {
         pub const Self = @This();
@@ -41,8 +45,8 @@ fn Iterator(comptime T: type, comptime width: u32, comptime height: u32) type {
         pub fn next(self: *Self) ?Result {
             defer self.i += 1;
 
-            const x: u32 = @intCast(std.math.mod(u64, self.i, width) catch unreachable);
-            const y: u32 = @intCast(@divTrunc(self.i, width));
+            const x: usize = std.math.mod(u64, self.i, width) catch unreachable;
+            const y: usize = @divTrunc(self.i, width);
             if (x >= width or y >= height) return null;
 
             return .{
@@ -56,8 +60,8 @@ fn Iterator(comptime T: type, comptime width: u32, comptime height: u32) type {
 
 test {
     const Tile = struct {
-        x: u32 = 0,
-        y: u32 = 0,
+        x: usize = 0,
+        y: usize = 0,
     };
 
     var list: Array2D(Tile, 3, 4) = .init();
@@ -65,6 +69,7 @@ test {
     while (iter.next()) |e| {
         // Initialize all tiles
         e.t.* = .{};
-        std.log.err("{}, {}: {}", .{ e.x, e.y, e.t });
+        try std.testing.expectEqual(e.t.x, 0);
+        try std.testing.expectEqual(e.t.y, 0);
     }
 }

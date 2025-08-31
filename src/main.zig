@@ -4,15 +4,13 @@ const std = @import("std");
 const Level1 = @import("level1/level1.zig").Level1;
 
 const Input = @import("input.zig");
+const random_mod = @import("random.zig");
 
 const screen_width = 800;
 const screen_height = 600;
 
 pub fn main() !void {
     defer sdl.shutdown();
-
-    Input.init(std.heap.smp_allocator);
-    defer Input.deinit();
 
     // Initialize SDL with subsystems you need here.
     const init_flags = sdl.InitFlags{
@@ -22,6 +20,11 @@ pub fn main() !void {
     };
     try sdl.init(init_flags);
     defer sdl.quit(init_flags);
+
+    Input.init(std.heap.smp_allocator);
+    defer Input.deinit();
+
+    random_mod.init();
 
     const window = try sdl.video.Window.init(
         "Death Perception",

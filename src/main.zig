@@ -55,25 +55,26 @@ pub fn main() !void {
         .packed_xrgb_8_8_8_8,
     );
 
-    const scale = 3.0;
+    const scale = 1.0;
 
-    while (true) {
+    const surface = try window.getSurface();
+
+    var running = true;
+    while (running) {
         // Delay to limit the FPS
         const dt = fps_capper.delay();
 
         while (sdl.events.poll()) |event| {
             switch (event) {
                 .key_up, .key_down => |e| try Input.update(e),
-                .quit, .terminating => break,
+                .quit, .terminating => running = false,
                 else => {},
             }
         }
 
-        if (Input.isPressed(.escape)) break;
+        if (!running or Input.isPressed(.escape)) break;
 
         try level.update(dt);
-
-        const surface = try window.getSurface();
 
         try level_surface.fillRect(null, surface.mapRgb(100, 100, 100));
         try level.render(level_surface);

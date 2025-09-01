@@ -15,7 +15,7 @@ pub const Player = struct {
 
     alloc: Allocator,
 
-    loc: Point = .{ .x = 400, .y = 300 },
+    loc: Point = .{ .x = 400, .y = 150 },
     image: Surface,
     half_image_size: Point = undefined,
 

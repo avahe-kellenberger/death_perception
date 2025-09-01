@@ -8,51 +8,46 @@ const Spritesheet = @import("spritesheet.zig").Spritesheet;
 const Tile = struct {
     floor_image_index: isize = -1,
     wall_image_index: isize = -1,
-    neighbor_bit_sum: u8,
-    is_wall: bool,
+    neighbor_bit_sum: u8 = 0,
+    is_wall: bool = false,
 };
 
-pub fn Map(
-    comptime width: usize,
-    comptime height: usize,
-    floor_sheet: Spritesheet(usize, usize),
-    wall_sheet: Spritesheet(usize, usize),
-) type {
+pub fn Map(comptime width: usize, comptime height: usize) type {
     return struct {
         pub const Self = @This();
 
-        var floor_tiles_image: sdl.surface.Surface = undefined;
-        var wall_tiles_image: sdl.surface.Surface = undefined;
-
         alloc: Allocator,
-        tiles: Array2D(Tile, width, height),
+        floor_tiles_sheet: Spritesheet,
+        wall_tiles_sheet: Spritesheet,
         tile_size: usize,
-
-        floor_tiles_sheet: Spritesheet(usize, usize) = floor_sheet,
-        wall_tiles_sheet: Spritesheet(usize, usize) = wall_sheet,
+        tiles: Array2D(Tile, width, height),
 
         pub fn init(
             alloc: Allocator,
+            floor_tiles_sheet: Spritesheet,
+            wall_tiles_sheet: Spritesheet,
             tile_size: usize,
             density: f32,
             border_thickness: usize,
         ) !Map(width, height) {
-            floor_tiles_image = try sdl.image.loadFile("./assets/images/floor_tiles.png");
-            wall_tiles_image = try sdl.image.loadFile("./assets/images/wall_tiles.png");
-
             var result = Map(width, height){
                 .alloc = alloc,
+                .floor_tiles_sheet = floor_tiles_sheet,
+                .wall_tiles_sheet = wall_tiles_sheet,
                 .tiles = Array2D(Tile, width, height).init(),
                 .tile_size = tile_size,
             };
 
             var iter = result.tiles.iterator();
             while (iter.next()) |e| {
-                e.t.is_wall = (e.x < border_thickness or
-                    e.x >= (width - border_thickness) or
-                    e.y < border_thickness or
-                    e.y >= (height - border_thickness) or
-                    (density > 0 and density >= rand(f32, 0, 100)));
+                // Initialize all tiles
+                e.t.* = .{
+                    .is_wall = (e.x < border_thickness or
+                        e.x >= (width - border_thickness) or
+                        e.y < border_thickness or
+                        e.y >= (height - border_thickness) or
+                        (density > 0 and density >= rand(f32, 0, 100))),
+                };
             }
 
             // Create basic map layout
@@ -65,9 +60,8 @@ pub fn Map(
         }
 
         pub fn deinit(self: *Self) void {
-            _ = self;
-            floor_tiles_image.deinit();
-            wall_tiles_image.deinit();
+            self.floor_tiles_sheet.deinit();
+            self.wall_tiles_sheet.deinit();
         }
 
         fn processCellularAutoma(self: *Self) void {
@@ -81,6 +75,10 @@ pub fn Map(
                     var num_neighboring_walls: usize = 0;
                     for (self.getMooreNeighborhood(e.x, e.y)) |is_wall| {
                         if (is_wall) num_neighboring_walls += 1;
+                    }
+
+                    if (self.tiles.get(e.x, e.y).is_wall) {
+                        num_neighboring_walls += 1;
                     }
 
                     const was_wall = self.tiles.get(e.x, e.y).is_wall;
@@ -235,17 +233,17 @@ pub fn Map(
         ///
         fn calcNeighborBitsum(self: *Self, is_wall: bool, x: usize, y: usize) u8 {
             var result: u8 = 0;
-            for (self.getMooreNeighborhood(x, y), 0..) |neighbor_is_wall, i| {
+            inline for (self.getMooreNeighborhood(x, y), 0..) |neighbor_is_wall, i| {
                 if (is_wall == neighbor_is_wall) {
-                    result += @shlExact(1, i);
+                    result += 1 << i;
                 }
             }
             return result;
         }
 
-        fn getMooreNeighborhood(self: *Self, x: usize, y: usize) [9]bool {
+        fn getMooreNeighborhood(self: *Self, x: usize, y: usize) [8]bool {
             // TODO: Can return a u8 here (bits) instead. Skip own tile
-            var result: [9]bool = @splat(true);
+            var result: [8]bool = @splat(false);
 
             // Top row
             if (x > 0 and y > 0) result[0] = self.tiles.get(x - 1, y - 1).is_wall;
@@ -254,59 +252,57 @@ pub fn Map(
 
             // Middle row
             if (x > 0) result[3] = self.tiles.get(x - 1, y).is_wall;
-            if (true) result[4] = self.tiles.get(x, y).is_wall;
-            if (x < width - 1) result[5] = self.tiles.get(x + 1, y).is_wall;
+            // NOTE: Skip own tile
+            // if (true) result[4] = self.tiles.get(x, y).is_wall;
+            if (x < width - 1) result[4] = self.tiles.get(x + 1, y).is_wall;
 
             // Bottom row
-            if (x > 0 and y < height - 1) result[6] = self.tiles.get(x - 1, y + 1).is_wall;
-            if (y < height - 1) result[7] = self.tiles.get(x, y + 1).is_wall;
-            if (x < width - 1 and y < height - 1) result[8] = self.tiles.get(x + 1, y + 1).is_wall;
+            if (x > 0 and y < height - 1) result[5] = self.tiles.get(x - 1, y + 1).is_wall;
+            if (y < height - 1) result[6] = self.tiles.get(x, y + 1).is_wall;
+            if (x < width - 1 and y < height - 1) result[7] = self.tiles.get(x + 1, y + 1).is_wall;
 
             return result;
         }
 
         pub fn render(self: *Self, ctx: sdl.surface.Surface, offset_x: f32, offset_y: f32) !void {
-            var iter = self.tiles.iterator();
-            while (iter.next()) |e| {
-                const tile_x = @as(f32, @floatFromInt(e.x * self.tile_size)) + offset_x;
-                const tile_y = @as(f32, @floatFromInt(e.y * self.tile_size)) + offset_y;
+            // Render floor tiles
+            {
+                var iter = self.tiles.iterator();
+                while (iter.next()) |e| {
+                    if (e.t.floor_image_index >= 0) {
+                        const sprite_rect = self.floor_tiles_sheet.sprites[@intCast(e.t.floor_image_index)];
+                        const dest: sdl.rect.IRect = .{
+                            .x = calcTileLocation(e.x, self.tile_size, offset_x),
+                            .y = calcTileLocation(e.y, self.tile_size, offset_y),
+                            .w = sprite_rect.w,
+                            .h = sprite_rect.h,
+                        };
+                        try self.floor_tiles_sheet.sheet.blitScaled(sprite_rect, ctx, dest, .nearest);
+                    }
+                }
+            }
 
-                if (e.t.floor_image_index >= 0) {
-                    const sprite_rect = self.wall_tiles_sheet.get(e.t.floor_image_index);
-                    const dest: sdl.rect.IRect(i32) = .{
-                        .x = @floor(tile_x + @as(f32, @floatFromInt(self.tile_size)) * 0.5),
-                        .y = @floor(tile_y + @as(f32, @floatFromInt(self.tile_size)) * 0.5),
-                        .w = sprite_rect.w,
-                        .h = sprite_rect.h,
-                    };
-                    try floor_tiles_image.blitScaled(sprite_rect, ctx, dest, .nearest);
+            // Render wall tiles
+            {
+                var iter = self.tiles.iterator();
+                while (iter.next()) |e| {
+                    if (e.t.wall_image_index >= 0) {
+                        const sprite_rect = self.wall_tiles_sheet.sprites[@intCast(e.t.wall_image_index)];
+                        const dest: sdl.rect.IRect = .{
+                            .x = calcTileLocation(e.x, self.tile_size, offset_x),
+                            .y = calcTileLocation(e.y, self.tile_size, offset_y),
+                            .w = sprite_rect.w,
+                            .h = sprite_rect.h,
+                        };
+                        try self.wall_tiles_sheet.sheet.blitScaled(sprite_rect, ctx, dest, .nearest);
+                    }
                 }
             }
         }
+
+        fn calcTileLocation(tile_map_index: usize, tile_size: usize, offset: f32) i32 {
+            const real_world: f32 = @as(f32, @floatFromInt(tile_map_index * tile_size)) + offset;
+            return @as(i32, @intFromFloat(@floor(real_world)));
+        }
     };
-}
-
-test {
-    std.testing.log_level = .debug;
-
-    @import("random.zig").init();
-
-    var map = try Map(100, 100).init(std.testing.allocator, 32, 46.0, 4);
-    defer map.deinit();
-
-    var iter = map.tiles.iterator();
-    var prev_y: usize = 0;
-    while (iter.next()) |e| {
-        if (e.y != prev_y) {
-            std.debug.print("\n", .{});
-            prev_y = e.y;
-        }
-
-        if (e.t.is_wall) {
-            std.debug.print("XX", .{});
-        } else {
-            std.debug.print("  ", .{});
-        }
-    }
-    std.debug.print("\n", .{});
 }

@@ -22,6 +22,7 @@ pub const Player = struct {
 
     pub fn init(alloc: Allocator, renderer: Renderer) !Player {
         const image = try sdl.image.loadTexture(renderer, "./assets/images/player.png");
+        try image.setScaleMode(.nearest);
         return .{
             .alloc = alloc,
             .image = image,

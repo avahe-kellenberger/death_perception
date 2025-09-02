@@ -21,7 +21,10 @@ pub const Level1 = struct {
 
     pub fn init(alloc: Allocator, renderer: Renderer) !Level1 {
         floor_tiles_image = try sdl.image.loadTexture(renderer, "./assets/images/floor_tiles.png");
+        try floor_tiles_image.setScaleMode(.nearest);
+
         wall_tiles_image = try sdl.image.loadTexture(renderer, "./assets/images/wall_tiles.png");
+        try wall_tiles_image.setScaleMode(.nearest);
 
         const floor_sheet = try Spritesheet.init(alloc, floor_tiles_image, 2, 3);
         const wall_sheet = try Spritesheet.init(alloc, wall_tiles_image, 3, 5);

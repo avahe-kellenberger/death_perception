@@ -6,8 +6,8 @@ const Level1 = @import("level1/level1.zig").Level1;
 const Input = @import("input.zig");
 const random_mod = @import("random.zig");
 
-const screen_width = 800;
-const screen_height = 600;
+const screen_width = 1600;
+const screen_height = 900;
 
 pub fn main() !void {
     defer sdl.shutdown();
@@ -26,13 +26,25 @@ pub fn main() !void {
 
     random_mod.init();
 
-    const window = try sdl.video.Window.init(
+    // const window = try sdl.video.Window.init(
+    //     "Death Perception",
+    //     screen_width,
+    //     screen_height,
+    //     .{},
+    // );
+    // defer window.deinit();
+
+    const foo = try sdl.render.Renderer.initWithWindow(
         "Death Perception",
         screen_width,
         screen_height,
         .{},
     );
-    defer window.deinit();
+
+    // const window = foo.window;
+    const renderer = foo.renderer;
+
+    std.log.err("{s}", .{try renderer.getName()});
 
     const alloc = std.heap.smp_allocator;
 
@@ -42,27 +54,45 @@ pub fn main() !void {
 
     const refresh_rate: usize = if (modes[0].refresh_rate) |rr| @intFromFloat(rr) else 60;
 
+    const frame_delay: f32 = 1.0 / @as(f32, @floatFromInt(refresh_rate));
+
     var fps_capper = sdl.extras.FramerateCapper(f32){ .mode = .{ .limited = refresh_rate } };
 
     std.log.info("FPS set to {}", .{refresh_rate});
 
-    var level = try Level1.init(alloc);
+    var level = try Level1.init(alloc, renderer);
     defer level.deinit();
 
-    const level_surface = try sdl.surface.Surface.init(
-        screen_width,
-        screen_height,
-        .packed_xrgb_8_8_8_8,
-    );
+    // const level_surface = try sdl.surface.Surface.init(
+    //     screen_width,
+    //     screen_height,
+    //     .packed_xrgb_8_8_8_8,
+    // );
 
-    const scale = 1.0;
+    // const scale = 1.0;
 
-    const surface = try window.getSurface();
+    // const surface = try window.getSurface();
+
+    // _ = surface.setClipRect(.{
+    //     .x = 0,
+    //     .y = 0,
+    //     .w = screen_width,
+    //     .h = screen_height,
+    // });
+    //
+    // _ = level_surface.setClipRect(.{
+    //     .x = 0,
+    //     .y = 0,
+    //     .w = screen_width,
+    //     .h = screen_height,
+    // });
 
     var running = true;
     while (running) {
         // Delay to limit the FPS
         const dt = fps_capper.delay();
+        std.log.err("{}", .{dt});
+        std.log.err("Real FPS: {}", .{fps_capper.getObservedFps()});
 
         while (sdl.events.poll()) |event| {
             switch (event) {
@@ -74,19 +104,22 @@ pub fn main() !void {
 
         if (!running or Input.isPressed(.escape)) break;
 
-        try level.update(dt);
+        try level.update(frame_delay);
 
-        try level_surface.fillRect(null, surface.mapRgb(100, 100, 100));
-        try level.render(level_surface);
+        // try surface.fillRect(null, surface.mapRgb(100, 100, 100));
 
-        try level_surface.blitScaled(null, surface, .{
-            .x = (screen_width * 0.5) * -(scale - 1.0),
-            .y = (screen_height * 0.5) * -(scale - 1.0),
-            .w = screen_width * scale,
-            .h = screen_height * scale,
-        }, .nearest);
+        try level.render(renderer);
 
-        try window.updateSurface();
+        // try level_surface.blitScaled(null, surface, .{
+        //     .x = (screen_width * 0.5) * -(scale - 1.0),
+        //     .y = (screen_height * 0.5) * -(scale - 1.0),
+        //     .w = screen_width * scale,
+        //     .h = screen_height * scale,
+        // }, .nearest);
+
+        try renderer.present();
+
+        // try window.updateSurface();
     }
 }
 

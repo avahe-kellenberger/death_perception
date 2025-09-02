@@ -1,8 +1,9 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const sdl = @import("sdl3");
 
-const Surface = sdl.surface.Surface;
+const sdl = @import("sdl3");
+const Renderer = sdl.render.Renderer;
+const Texture = sdl.render.Texture;
 const Point = sdl.rect.Point(f32);
 
 const Input = @import("input.zig");
@@ -15,18 +16,18 @@ pub const Player = struct {
 
     alloc: Allocator,
 
-    loc: Point = .{ .x = 400, .y = 150 },
-    image: Surface,
-    half_image_size: Point = undefined,
+    image: Texture,
+    loc: Point = .{ .x = 0, .y = 0 },
+    image_size: Point = undefined,
 
-    pub fn init(alloc: Allocator) !Player {
-        const image = try sdl.image.loadFile("./assets/images/player.png");
+    pub fn init(alloc: Allocator, renderer: Renderer) !Player {
+        const image = try sdl.image.loadTexture(renderer, "./assets/images/player.png");
         return .{
             .alloc = alloc,
             .image = image,
-            .half_image_size = .{
-                .x = @as(f32, @floatFromInt(image.getWidth())) * 0.5,
-                .y = @as(f32, @floatFromInt(image.getHeight())) * 0.5,
+            .image_size = .{
+                .x = @as(f32, @floatFromInt(image.getWidth())),
+                .y = @as(f32, @floatFromInt(image.getHeight())),
             },
         };
     }
@@ -49,10 +50,12 @@ pub const Player = struct {
         self.loc.y += vel.y * dt;
     }
 
-    pub fn render(self: *Self, ctx: Surface) !void {
-        try self.image.blit(null, ctx, .{
-            .x = @intFromFloat(self.loc.x - self.half_image_size.x),
-            .y = @intFromFloat(self.loc.y - self.half_image_size.y),
+    pub fn render(self: *Self, ctx: Renderer, offset_x: f32, offset_y: f32) !void {
+        try ctx.renderTexture(self.image, null, .{
+            .x = self.loc.x - self.image_size.x * 0.5 + offset_x,
+            .y = self.loc.y - self.image_size.y * 0.5 + offset_y,
+            .w = self.image_size.x,
+            .h = self.image_size.y,
         });
     }
 };

@@ -1,6 +1,11 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+
 const sdl = @import("sdl3");
+const Renderer = sdl.render.Renderer;
+const Surface = sdl.surface.Surface;
+const FRect = sdl.rect.FRect;
+
 const rand = @import("random.zig").rand;
 const Array2D = @import("array_2d.zig").Array2D;
 const Spritesheet = @import("spritesheet.zig").Spritesheet;
@@ -19,14 +24,14 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
         alloc: Allocator,
         floor_tiles_sheet: Spritesheet,
         wall_tiles_sheet: Spritesheet,
-        tile_size: usize,
+        tile_size: f32,
         tiles: Array2D(Tile, width, height),
 
         pub fn init(
             alloc: Allocator,
             floor_tiles_sheet: Spritesheet,
             wall_tiles_sheet: Spritesheet,
-            tile_size: usize,
+            tile_size: f32,
             density: f32,
             border_thickness: usize,
         ) !Map(width, height) {
@@ -264,20 +269,24 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
             return result;
         }
 
-        pub fn render(self: *Self, ctx: sdl.surface.Surface, offset_x: f32, offset_y: f32) !void {
+        // TODO: Render context (camera + offset?)
+
+        pub fn render(self: *Self, ctx: Renderer, offset_x: f32, offset_y: f32) !void {
             // Render floor tiles
             {
                 var iter = self.tiles.iterator();
                 while (iter.next()) |e| {
+                    // TODO: Determine with camera params
+                    if (e.x > 100 or e.y > 57) continue;
                     if (e.t.floor_image_index >= 0) {
                         const sprite_rect = self.floor_tiles_sheet.sprites[@intCast(e.t.floor_image_index)];
-                        const dest: sdl.rect.IRect = .{
+                        const dest: FRect = .{
                             .x = calcTileLocation(e.x, self.tile_size, offset_x),
                             .y = calcTileLocation(e.y, self.tile_size, offset_y),
                             .w = sprite_rect.w,
                             .h = sprite_rect.h,
                         };
-                        try self.floor_tiles_sheet.sheet.blitScaled(sprite_rect, ctx, dest, .nearest);
+                        try ctx.renderTexture(self.floor_tiles_sheet.sheet, sprite_rect, dest);
                     }
                 }
             }
@@ -286,23 +295,25 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
             {
                 var iter = self.tiles.iterator();
                 while (iter.next()) |e| {
+                    // TODO: Determine with camera params
+                    if (e.x > 100 or e.y > 57) continue;
                     if (e.t.wall_image_index >= 0) {
                         const sprite_rect = self.wall_tiles_sheet.sprites[@intCast(e.t.wall_image_index)];
-                        const dest: sdl.rect.IRect = .{
+                        const dest: FRect = .{
                             .x = calcTileLocation(e.x, self.tile_size, offset_x),
                             .y = calcTileLocation(e.y, self.tile_size, offset_y),
                             .w = sprite_rect.w,
                             .h = sprite_rect.h,
                         };
-                        try self.wall_tiles_sheet.sheet.blitScaled(sprite_rect, ctx, dest, .nearest);
+                        try ctx.renderTexture(self.wall_tiles_sheet.sheet, sprite_rect, dest);
                     }
                 }
             }
         }
 
-        fn calcTileLocation(tile_map_index: usize, tile_size: usize, offset: f32) i32 {
-            const real_world: f32 = @as(f32, @floatFromInt(tile_map_index * tile_size)) + offset;
-            return @as(i32, @intFromFloat(@floor(real_world)));
+        fn calcTileLocation(tile_coord: usize, tile_size: f32, offset: f32) f32 {
+            const tile_coord_float: f32 = @floatFromInt(tile_coord);
+            return @floor(tile_coord_float * tile_size + offset);
         }
     };
 }

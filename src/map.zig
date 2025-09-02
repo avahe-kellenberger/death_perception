@@ -6,6 +6,7 @@ const Renderer = sdl.render.Renderer;
 const Surface = sdl.surface.Surface;
 const FRect = sdl.rect.FRect;
 
+const Camera = @import("camera.zig").Camera;
 const rand = @import("random.zig").rand;
 const Array2D = @import("array_2d.zig").Array2D;
 const Spritesheet = @import("spritesheet.zig").Spritesheet;
@@ -271,22 +272,22 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
 
         // TODO: Render context (camera + offset?)
 
-        pub fn render(self: *Self, ctx: Renderer, offset_x: f32, offset_y: f32) !void {
+        pub fn render(self: *Self, ctx: Renderer, camera: *Camera) !void {
             // Render floor tiles
             {
                 var iter = self.tiles.iterator();
                 while (iter.next()) |e| {
-                    // TODO: Determine with camera params
-                    if (e.x > 100 or e.y > 57) continue;
                     if (e.t.floor_image_index >= 0) {
                         const sprite_rect = self.floor_tiles_sheet.sprites[@intCast(e.t.floor_image_index)];
                         const dest: FRect = .{
-                            .x = calcTileLocation(e.x, self.tile_size, offset_x),
-                            .y = calcTileLocation(e.y, self.tile_size, offset_y),
+                            .x = calcTileLocation(e.x, self.tile_size, -camera.viewport.x),
+                            .y = calcTileLocation(e.y, self.tile_size, -camera.viewport.y),
                             .w = sprite_rect.w,
                             .h = sprite_rect.h,
                         };
-                        try ctx.renderTexture(self.floor_tiles_sheet.sheet, sprite_rect, dest);
+                        if (camera.intersects(dest)) {
+                            try ctx.renderTexture(self.floor_tiles_sheet.sheet, sprite_rect, dest);
+                        }
                     }
                 }
             }
@@ -295,17 +296,18 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
             {
                 var iter = self.tiles.iterator();
                 while (iter.next()) |e| {
-                    // TODO: Determine with camera params
-                    if (e.x > 100 or e.y > 57) continue;
                     if (e.t.wall_image_index >= 0) {
                         const sprite_rect = self.wall_tiles_sheet.sprites[@intCast(e.t.wall_image_index)];
                         const dest: FRect = .{
-                            .x = calcTileLocation(e.x, self.tile_size, offset_x),
-                            .y = calcTileLocation(e.y, self.tile_size, offset_y),
+                            .x = calcTileLocation(e.x, self.tile_size, -camera.viewport.x),
+                            .y = calcTileLocation(e.y, self.tile_size, -camera.viewport.y),
                             .w = sprite_rect.w,
                             .h = sprite_rect.h,
                         };
-                        try ctx.renderTexture(self.wall_tiles_sheet.sheet, sprite_rect, dest);
+
+                        if (camera.intersects(dest)) {
+                            try ctx.renderTexture(self.wall_tiles_sheet.sheet, sprite_rect, dest);
+                        }
                     }
                 }
             }

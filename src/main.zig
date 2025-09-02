@@ -2,6 +2,7 @@ const sdl = @import("sdl3");
 const std = @import("std");
 
 const Level1 = @import("level1/level1.zig").Level1;
+const Camera = @import("camera.zig").Camera;
 
 const Input = @import("input.zig");
 const random_mod = @import("random.zig");
@@ -26,12 +27,15 @@ pub fn main() !void {
 
     random_mod.init();
 
-    const renderer = (try sdl.render.Renderer.initWithWindow(
+    const foo = try sdl.render.Renderer.initWithWindow(
         "Death Perception",
         screen_width,
         screen_height,
         .{},
-    )).renderer;
+    );
+
+    const renderer = foo.renderer;
+    const window = foo.window;
 
     const scale = 3.0;
     try renderer.setScale(scale, scale);
@@ -49,6 +53,8 @@ pub fn main() !void {
 
     std.log.info("FPS set to {}", .{refresh_rate});
 
+    var camera = try Camera.init(window);
+
     var level = try Level1.init(alloc, renderer);
     defer level.deinit();
 
@@ -63,6 +69,9 @@ pub fn main() !void {
             switch (event) {
                 .key_up, .key_down => |e| try Input.update(e),
                 .quit, .terminating => running = false,
+                .window_pixel_size_changed => |e| {
+                    camera.setViewportSize(e.width, e.height);
+                },
                 else => {},
             }
         }
@@ -70,7 +79,7 @@ pub fn main() !void {
         if (!running or Input.isPressed(.escape)) break;
 
         try level.update(frame_delay);
-        try level.render(renderer);
+        try level.render(renderer, &camera);
 
         try renderer.present();
     }

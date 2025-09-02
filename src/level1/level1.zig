@@ -7,6 +7,7 @@ const Texture = sdl.render.Texture;
 const Player = @import("../player.zig").Player;
 const Map = @import("../map.zig").Map;
 const Spritesheet = @import("../spritesheet.zig").Spritesheet;
+const Camera = @import("../camera.zig").Camera;
 
 pub const Level1 = struct {
     pub const Self = @This();
@@ -47,8 +48,8 @@ pub const Level1 = struct {
         try self.player.update(dt);
     }
 
-    pub fn render(self: *Self, ctx: Renderer) !void {
-        try self.map.render(ctx, 0, 0);
-        try self.player.render(ctx, 0, 0);
+    pub fn render(self: *Self, ctx: Renderer, camera: *Camera) !void {
+        try self.map.render(ctx, camera);
+        try self.player.render(ctx, camera);
     }
 };

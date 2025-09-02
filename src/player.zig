@@ -6,6 +6,7 @@ const Renderer = sdl.render.Renderer;
 const Texture = sdl.render.Texture;
 const Point = sdl.rect.Point(f32);
 
+const Camera = @import("camera.zig").Camera;
 const Input = @import("input.zig");
 const Vector = @import("vector.zig").Vector;
 
@@ -51,10 +52,10 @@ pub const Player = struct {
         self.loc.y += vel.y * dt;
     }
 
-    pub fn render(self: *Self, ctx: Renderer, offset_x: f32, offset_y: f32) !void {
+    pub fn render(self: *Self, ctx: Renderer, camera: *Camera) !void {
         try ctx.renderTexture(self.image, null, .{
-            .x = self.loc.x - self.image_size.x * 0.5 + offset_x,
-            .y = self.loc.y - self.image_size.y * 0.5 + offset_y,
+            .x = self.loc.x - self.image_size.x * 0.5 - camera.viewport.x,
+            .y = self.loc.y - self.image_size.y * 0.5 - camera.viewport.y,
             .w = self.image_size.x,
             .h = self.image_size.y,
         });

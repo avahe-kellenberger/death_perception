@@ -318,9 +318,9 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
         }
 
         fn isOnScreen(r: FRect, camera: *Camera) bool {
-            return !(r.x >= camera.viewport.w or
+            return !(r.x >= camera.scaled_viewport.w or
                 r.x + r.w <= 0 or
-                r.y >= camera.viewport.h or
+                r.y >= camera.scaled_viewport.h or
                 r.y + r.h <= 0);
         }
     };

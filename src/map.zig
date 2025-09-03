@@ -3,11 +3,10 @@ const Allocator = std.mem.Allocator;
 
 const sdl = @import("sdl3");
 const Renderer = sdl.render.Renderer;
-const Surface = sdl.surface.Surface;
 const FRect = sdl.rect.FRect;
 const FPoint = sdl.rect.FPoint;
 
-const Camera = @import("camera.zig").Camera;
+const RenderContext = @import("render-context.zig").RenderContext;
 const rand = @import("random.zig").rand;
 const Array2D = @import("array_2d.zig").Array2D;
 const Spritesheet = @import("spritesheet.zig").Spritesheet;
@@ -219,7 +218,7 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
                     };
                 } else {
                     e.t.floor_image_index = switch (e.t.neighbor_bit_sum) {
-                        104, 105, 232, 233, 248, 249, 252 => 2,
+                        100, 104, 105, 232, 233, 248, 249, 252 => 2,
                         22, 150, 214, 246 => 3,
                         254 => 4,
                         208, 212, 240, 244 => 5,
@@ -271,22 +270,20 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
             return result;
         }
 
-        pub fn render(self: *Self, ctx: Renderer, camera: *Camera, offset: FPoint) !void {
+        pub fn render(self: *Self, ctx: *RenderContext) !void {
             // Render floor tiles
             {
                 var iter = self.tiles.iterator();
                 while (iter.next()) |e| {
                     if (e.t.floor_image_index >= 0) {
                         const sprite_rect = self.floor_tiles_sheet.sprites[@intCast(e.t.floor_image_index)];
-                        const dest: FRect = .{
-                            .x = calcTileLocation(e.x, self.tile_size, offset.x),
-                            .y = calcTileLocation(e.y, self.tile_size, offset.y),
+                        var dest: FRect = .{
+                            .x = calcTileLocation(e.x, self.tile_size),
+                            .y = calcTileLocation(e.y, self.tile_size),
                             .w = sprite_rect.w,
                             .h = sprite_rect.h,
                         };
-                        if (isOnScreen(dest, camera)) {
-                            try ctx.renderTexture(self.floor_tiles_sheet.sheet, sprite_rect, dest);
-                        }
+                        try ctx.renderTexture(self.floor_tiles_sheet.sheet, sprite_rect, &dest);
                     }
                 }
             }
@@ -297,31 +294,21 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
                 while (iter.next()) |e| {
                     if (e.t.wall_image_index >= 0) {
                         const sprite_rect = self.wall_tiles_sheet.sprites[@intCast(e.t.wall_image_index)];
-                        const dest: FRect = .{
-                            .x = calcTileLocation(e.x, self.tile_size, offset.x),
-                            .y = calcTileLocation(e.y, self.tile_size, offset.y),
+                        var dest: FRect = .{
+                            .x = calcTileLocation(e.x, self.tile_size),
+                            .y = calcTileLocation(e.y, self.tile_size),
                             .w = sprite_rect.w,
                             .h = sprite_rect.h,
                         };
-
-                        if (isOnScreen(dest, camera)) {
-                            try ctx.renderTexture(self.wall_tiles_sheet.sheet, sprite_rect, dest);
-                        }
+                        try ctx.renderTexture(self.wall_tiles_sheet.sheet, sprite_rect, &dest);
                     }
                 }
             }
         }
 
-        fn calcTileLocation(tile_coord: usize, tile_size: f32, offset: f32) f32 {
+        fn calcTileLocation(tile_coord: usize, tile_size: f32) f32 {
             const tile_coord_float: f32 = @floatFromInt(tile_coord);
-            return @floor(tile_coord_float * tile_size + offset);
-        }
-
-        fn isOnScreen(r: FRect, camera: *Camera) bool {
-            return !(r.x >= camera.scaled_viewport.w or
-                r.x + r.w <= 0 or
-                r.y >= camera.scaled_viewport.h or
-                r.y + r.h <= 0);
+            return @floor(tile_coord_float * tile_size);
         }
     };
 }

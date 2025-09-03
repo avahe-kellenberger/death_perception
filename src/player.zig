@@ -4,8 +4,10 @@ const Allocator = std.mem.Allocator;
 const sdl = @import("sdl3");
 const Renderer = sdl.render.Renderer;
 const Texture = sdl.render.Texture;
+const FRect = sdl.rect.FRect;
 const FPoint = sdl.rect.FPoint;
 
+const RenderContext = @import("render-context.zig").RenderContext;
 const Camera = @import("camera.zig").Camera;
 const Input = @import("input.zig");
 const Vector = @import("vector.zig").Vector;
@@ -52,12 +54,13 @@ pub const Player = struct {
         self.loc.y += vel.y * dt;
     }
 
-    pub fn render(self: *Self, ctx: Renderer, _: *Camera, offset: FPoint) !void {
-        try ctx.renderTexture(self.image, null, .{
-            .x = self.loc.x - self.image_size.x * 0.5 + offset.x,
-            .y = self.loc.y - self.image_size.y * 0.5 + offset.y,
+    pub fn render(self: *Self, ctx: *RenderContext) !void {
+        var dest: FRect = .{
+            .x = self.loc.x - self.image_size.x * 0.5,
+            .y = self.loc.y - self.image_size.y * 0.5,
             .w = self.image_size.x,
             .h = self.image_size.y,
-        });
+        };
+        try ctx.renderTexture(self.image, null, &dest);
     }
 };

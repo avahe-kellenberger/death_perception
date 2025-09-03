@@ -6,6 +6,7 @@ const Renderer = sdl.render.Renderer;
 const Texture = sdl.render.Texture;
 const FPoint = sdl.rect.FPoint;
 
+const RenderContext = @import("../render-context.zig").RenderContext;
 const Player = @import("../player.zig").Player;
 const Map = @import("../map.zig").Map;
 const Spritesheet = @import("../spritesheet.zig").Spritesheet;
@@ -22,6 +23,8 @@ pub const Level1 = struct {
     player: Player,
     map: Map(144, 144),
     camera: *Camera,
+
+    ctx: RenderContext,
 
     pub fn init(alloc: Allocator, renderer: Renderer, camera: *Camera) !Level1 {
         floor_tiles_image = try sdl.image.loadTexture(renderer, "./assets/images/floor_tiles.png");
@@ -42,6 +45,10 @@ pub const Level1 = struct {
             .camera = camera,
             .player = player,
             .map = try .init(alloc, floor_sheet, wall_sheet, 16, 47.0, 10),
+            .ctx = .{
+                .renderer = renderer,
+                .camera = camera,
+            },
         };
     }
 
@@ -57,21 +64,21 @@ pub const Level1 = struct {
         self.camera.centerOnPoint(self.player.loc);
     }
 
-    pub fn render(self: *Self, ctx: Renderer) !void {
-        const relative_z = 1.0 - self.camera.getZoom();
+    pub fn render(self: *Self) !void {
+        const relative_z = 1.0 - self.camera.z;
         if (relative_z <= 0) return;
 
-        const inversedScalar = 1.0 / relative_z;
-        const offset: FPoint = .{
+        self.ctx.offset = .{
             .x = -1 * (self.camera.loc.x - self.camera.half_viewport_size.w * relative_z),
             .y = -1 * (self.camera.loc.y - self.camera.half_viewport_size.h * relative_z),
         };
 
-        try ctx.setScale(inversedScalar, inversedScalar);
+        const inversedScalar = 1.0 / relative_z;
+        try self.ctx.renderer.setScale(inversedScalar, inversedScalar);
 
-        try self.map.render(ctx, self.camera, offset);
-        try self.player.render(ctx, self.camera, offset);
+        try self.map.render(&self.ctx);
+        try self.player.render(&self.ctx);
 
-        try ctx.setScale(relative_z, relative_z);
+        try self.ctx.renderer.setScale(relative_z, relative_z);
     }
 };

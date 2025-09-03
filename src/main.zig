@@ -37,6 +37,14 @@ pub fn main() !void {
     const renderer = foo.renderer;
     const window = foo.window;
 
+    // TODO: This doesn't seem to affect fps?
+    try renderer.setClipRect(.{
+        .x = 0,
+        .y = 0,
+        .w = screen_width,
+        .h = screen_height,
+    });
+
     const alloc = std.heap.smp_allocator;
 
     var display = try sdl.video.Display.getPrimaryDisplay();
@@ -74,7 +82,7 @@ pub fn main() !void {
                     camera.setViewportSize(e.width, e.height);
                 },
                 .mouse_wheel => |e| {
-                    camera.zoom(e.scroll_y * 0.05);
+                    camera.z += e.scroll_y * 0.05;
                 },
                 else => {},
             }
@@ -84,7 +92,7 @@ pub fn main() !void {
 
         try renderer.renderFillRect(null);
         try level.update(frame_delay);
-        try level.render(renderer);
+        try level.render();
 
         try renderer.present();
     }

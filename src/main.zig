@@ -37,9 +37,6 @@ pub fn main() !void {
     const renderer = foo.renderer;
     const window = foo.window;
 
-    const scale = 3.0;
-    try renderer.setScale(scale, scale);
-
     const alloc = std.heap.smp_allocator;
 
     var display = try sdl.video.Display.getPrimaryDisplay();
@@ -53,9 +50,13 @@ pub fn main() !void {
 
     std.log.info("FPS set to {}", .{refresh_rate});
 
-    var camera = try Camera.init(window);
+    const window_size = try window.getSizeInPixels();
+    var camera = try Camera.init(.{ .x = 0, .y = 0 }, .{
+        .w = @floatFromInt(window_size.width),
+        .h = @floatFromInt(window_size.height),
+    });
 
-    var level = try Level1.init(alloc, renderer);
+    var level = try Level1.init(alloc, renderer, &camera);
     defer level.deinit();
 
     var running = true;
@@ -72,14 +73,18 @@ pub fn main() !void {
                 .window_pixel_size_changed => |e| {
                     camera.setViewportSize(e.width, e.height);
                 },
+                .mouse_wheel => |e| {
+                    camera.zoom(e.scroll_y * 0.05);
+                },
                 else => {},
             }
         }
 
         if (!running or Input.isPressed(.escape)) break;
 
+        try renderer.renderFillRect(null);
         try level.update(frame_delay);
-        try level.render(renderer, &camera);
+        try level.render(renderer);
 
         try renderer.present();
     }

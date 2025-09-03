@@ -4,7 +4,7 @@ const Allocator = std.mem.Allocator;
 const sdl = @import("sdl3");
 const Renderer = sdl.render.Renderer;
 const Texture = sdl.render.Texture;
-const Point = sdl.rect.Point(f32);
+const FPoint = sdl.rect.FPoint;
 
 const Camera = @import("camera.zig").Camera;
 const Input = @import("input.zig");
@@ -18,8 +18,8 @@ pub const Player = struct {
     alloc: Allocator,
 
     image: Texture,
-    loc: Point = .{ .x = 0, .y = 0 },
-    image_size: Point = undefined,
+    loc: FPoint = .{ .x = 0, .y = 0 },
+    image_size: FPoint = undefined,
 
     pub fn init(alloc: Allocator, renderer: Renderer) !Player {
         const image = try sdl.image.loadTexture(renderer, "./assets/images/player.png");
@@ -52,10 +52,10 @@ pub const Player = struct {
         self.loc.y += vel.y * dt;
     }
 
-    pub fn render(self: *Self, ctx: Renderer, camera: *Camera) !void {
+    pub fn render(self: *Self, ctx: Renderer, _: *Camera, offset: FPoint) !void {
         try ctx.renderTexture(self.image, null, .{
-            .x = self.loc.x - self.image_size.x * 0.5 - camera.viewport.x,
-            .y = self.loc.y - self.image_size.y * 0.5 - camera.viewport.y,
+            .x = self.loc.x - self.image_size.x * 0.5 + offset.x,
+            .y = self.loc.y - self.image_size.y * 0.5 + offset.y,
             .w = self.image_size.x,
             .h = self.image_size.y,
         });

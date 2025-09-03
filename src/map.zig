@@ -5,6 +5,7 @@ const sdl = @import("sdl3");
 const Renderer = sdl.render.Renderer;
 const Surface = sdl.surface.Surface;
 const FRect = sdl.rect.FRect;
+const FPoint = sdl.rect.FPoint;
 
 const Camera = @import("camera.zig").Camera;
 const rand = @import("random.zig").rand;
@@ -270,9 +271,7 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
             return result;
         }
 
-        // TODO: Render context (camera + offset?)
-
-        pub fn render(self: *Self, ctx: Renderer, camera: *Camera) !void {
+        pub fn render(self: *Self, ctx: Renderer, camera: *Camera, offset: FPoint) !void {
             // Render floor tiles
             {
                 var iter = self.tiles.iterator();
@@ -280,12 +279,12 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
                     if (e.t.floor_image_index >= 0) {
                         const sprite_rect = self.floor_tiles_sheet.sprites[@intCast(e.t.floor_image_index)];
                         const dest: FRect = .{
-                            .x = calcTileLocation(e.x, self.tile_size, -camera.viewport.x),
-                            .y = calcTileLocation(e.y, self.tile_size, -camera.viewport.y),
+                            .x = calcTileLocation(e.x, self.tile_size, offset.x),
+                            .y = calcTileLocation(e.y, self.tile_size, offset.y),
                             .w = sprite_rect.w,
                             .h = sprite_rect.h,
                         };
-                        if (camera.intersects(dest)) {
+                        if (isOnScreen(dest, camera)) {
                             try ctx.renderTexture(self.floor_tiles_sheet.sheet, sprite_rect, dest);
                         }
                     }
@@ -299,13 +298,13 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
                     if (e.t.wall_image_index >= 0) {
                         const sprite_rect = self.wall_tiles_sheet.sprites[@intCast(e.t.wall_image_index)];
                         const dest: FRect = .{
-                            .x = calcTileLocation(e.x, self.tile_size, -camera.viewport.x),
-                            .y = calcTileLocation(e.y, self.tile_size, -camera.viewport.y),
+                            .x = calcTileLocation(e.x, self.tile_size, offset.x),
+                            .y = calcTileLocation(e.y, self.tile_size, offset.y),
                             .w = sprite_rect.w,
                             .h = sprite_rect.h,
                         };
 
-                        if (camera.intersects(dest)) {
+                        if (isOnScreen(dest, camera)) {
                             try ctx.renderTexture(self.wall_tiles_sheet.sheet, sprite_rect, dest);
                         }
                     }
@@ -316,6 +315,13 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
         fn calcTileLocation(tile_coord: usize, tile_size: f32, offset: f32) f32 {
             const tile_coord_float: f32 = @floatFromInt(tile_coord);
             return @floor(tile_coord_float * tile_size + offset);
+        }
+
+        fn isOnScreen(r: FRect, camera: *Camera) bool {
+            return !(r.x >= camera.viewport.w or
+                r.x + r.w <= 0 or
+                r.y >= camera.viewport.h or
+                r.y + r.h <= 0);
         }
     };
 }

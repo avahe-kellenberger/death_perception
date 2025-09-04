@@ -43,7 +43,6 @@ pub fn main() !void {
     defer alloc.free(modes);
 
     const refresh_rate: usize = if (modes[0].refresh_rate) |rr| @intFromFloat(rr) else 60;
-    const frame_delay: f32 = 1.0 / @as(f32, @floatFromInt(refresh_rate));
 
     var fps_capper = sdl.extras.FramerateCapper(f32){ .mode = .{ .limited = refresh_rate } };
 
@@ -85,7 +84,7 @@ pub fn main() !void {
         if (!running or Input.isPressed(.escape)) break;
 
         try renderer.clear();
-        Game.update(frame_delay);
+        Game.update(dt);
         Game.render();
 
         try renderer.present();

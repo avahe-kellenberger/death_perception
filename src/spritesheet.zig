@@ -16,13 +16,13 @@ pub const Spritesheet = struct {
     sprites: []FRect,
     sprite_size: Size(usize),
 
-    pub fn init(alloc: Allocator, sheet: Texture, w: usize, h: usize) !Spritesheet {
+    pub fn init(alloc: Allocator, sheet: Texture, w: usize, h: usize) Spritesheet {
         var result: Spritesheet = .{
             .alloc = alloc,
             .sheet = sheet,
             .width = w,
             .height = h,
-            .sprites = try alloc.alloc(FRect, w * h),
+            .sprites = alloc.alloc(FRect, w * h) catch unreachable,
             .sprite_size = .{
                 .w = @divExact(sheet.getWidth(), w),
                 .h = @divExact(sheet.getHeight(), h),

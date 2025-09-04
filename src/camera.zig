@@ -16,7 +16,7 @@ pub const Camera = struct {
     // Camera zoom
     z: f32 = 0,
 
-    pub fn init(loc: FPoint, size: Size(f32)) !Camera {
+    pub fn init(loc: FPoint, size: Size(f32)) Camera {
         const viewport: FRect = .{
             .x = loc.x - size.w * 0.5,
             .y = loc.y - size.h * 0.5,

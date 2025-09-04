@@ -1,5 +1,4 @@
 const std = @import("std");
-const Allocator = std.mem.Allocator;
 
 const sdl = @import("sdl3");
 const Renderer = sdl.render.Renderer;
@@ -7,8 +6,7 @@ const Texture = sdl.render.Texture;
 const FRect = sdl.rect.FRect;
 const FPoint = sdl.rect.FPoint;
 
-const RenderContext = @import("render-context.zig").RenderContext;
-const Camera = @import("camera.zig").Camera;
+const Game = @import("game.zig");
 const Input = @import("input.zig");
 const Vector = @import("vector.zig").Vector;
 
@@ -17,17 +15,13 @@ const max_speed = 65.0;
 pub const Player = struct {
     pub const Self = @This();
 
-    alloc: Allocator,
-
     image: Texture,
     loc: FPoint = .{ .x = 0, .y = 0 },
     image_size: FPoint = undefined,
 
-    pub fn init(alloc: Allocator, renderer: Renderer) !Player {
-        const image = try sdl.image.loadTexture(renderer, "./assets/images/player.png");
-        try image.setScaleMode(.nearest);
+    pub fn init() Player {
+        const image = Game.loadTexture("./assets/images/player.png", .nearest);
         return .{
-            .alloc = alloc,
             .image = image,
             .image_size = .{
                 .x = @as(f32, @floatFromInt(image.getWidth())),
@@ -40,7 +34,7 @@ pub const Player = struct {
         self.image.deinit();
     }
 
-    pub fn update(self: *Self, dt: f32) !void {
+    pub fn update(self: *Self, dt: f32) void {
         var vel: Vector = .{};
         if (Input.isPressed(.left)) vel.x -= max_speed;
         if (Input.isPressed(.right)) vel.x += max_speed;
@@ -54,13 +48,13 @@ pub const Player = struct {
         self.loc.y += vel.y * dt;
     }
 
-    pub fn render(self: *Self, ctx: *RenderContext) !void {
+    pub fn render(self: *Self) void {
         var dest: FRect = .{
             .x = self.loc.x - self.image_size.x * 0.5,
             .y = self.loc.y - self.image_size.y * 0.5,
             .w = self.image_size.x,
             .h = self.image_size.y,
         };
-        try ctx.renderTexture(self.image, null, &dest);
+        Game.renderTexture(self.image, null, &dest);
     }
 };

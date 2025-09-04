@@ -6,7 +6,7 @@ const Renderer = sdl.render.Renderer;
 const FRect = sdl.rect.FRect;
 const FPoint = sdl.rect.FPoint;
 
-const RenderContext = @import("render-context.zig").RenderContext;
+const Game = @import("game.zig");
 const rand = @import("random.zig").rand;
 const Array2D = @import("array_2d.zig").Array2D;
 const Spritesheet = @import("spritesheet.zig").Spritesheet;
@@ -35,7 +35,7 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
             tile_size: f32,
             density: f32,
             border_thickness: usize,
-        ) !Map(width, height) {
+        ) Map(width, height) {
             var result = Map(width, height){
                 .alloc = alloc,
                 .floor_tiles_sheet = floor_tiles_sheet,
@@ -59,7 +59,7 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
             // Create basic map layout
             processCellularAutoma(&result);
             // Eliminate any smaller secluded rooms that were generated
-            try fillSmallerRooms(&result);
+            fillSmallerRooms(&result) catch unreachable;
             // Select correct images after map has been generated
             setupTileImages(&result);
             return result;
@@ -270,7 +270,7 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
             return result;
         }
 
-        pub fn render(self: *Self, ctx: *RenderContext) !void {
+        pub fn render(self: *Self) void {
             // Render floor tiles
             {
                 var iter = self.tiles.iterator();
@@ -283,7 +283,7 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
                             .w = sprite_rect.w,
                             .h = sprite_rect.h,
                         };
-                        try ctx.renderTexture(self.floor_tiles_sheet.sheet, sprite_rect, &dest);
+                        Game.renderTexture(self.floor_tiles_sheet.sheet, sprite_rect, &dest);
                     }
                 }
             }
@@ -300,7 +300,7 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
                             .w = sprite_rect.w,
                             .h = sprite_rect.h,
                         };
-                        try ctx.renderTexture(self.wall_tiles_sheet.sheet, sprite_rect, &dest);
+                        Game.renderTexture(self.wall_tiles_sheet.sheet, sprite_rect, &dest);
                     }
                 }
             }

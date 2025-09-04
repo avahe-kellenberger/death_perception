@@ -1,7 +1,7 @@
 const sdl = @import("sdl3");
 const std = @import("std");
 
-const Level1 = @import("level1/level1.zig").Level1;
+const Game = @import("game.zig");
 const Camera = @import("camera.zig").Camera;
 
 const Input = @import("input.zig");
@@ -27,15 +27,14 @@ pub fn main() !void {
 
     random_mod.init();
 
-    const foo = try sdl.render.Renderer.initWithWindow(
+    const initResult = try sdl.render.Renderer.initWithWindow(
         "Death Perception",
         screen_width,
         screen_height,
         .{},
     );
-
-    const renderer = foo.renderer;
-    const window = foo.window;
+    const renderer = initResult.renderer;
+    const window = initResult.window;
 
     // TODO: This doesn't seem to affect fps?
     try renderer.setClipRect(.{
@@ -59,13 +58,16 @@ pub fn main() !void {
     std.log.info("FPS set to {}", .{refresh_rate});
 
     const window_size = try window.getSizeInPixels();
-    var camera = try Camera.init(.{ .x = 0, .y = 0 }, .{
-        .w = @floatFromInt(window_size.width),
-        .h = @floatFromInt(window_size.height),
-    });
 
-    var level = try Level1.init(alloc, renderer, &camera);
-    defer level.deinit();
+    Game.init(
+        alloc,
+        renderer,
+        Camera.init(.{ .x = 0, .y = 0 }, .{
+            .w = @floatFromInt(window_size.width),
+            .h = @floatFromInt(window_size.height),
+        }),
+    );
+    defer Game.deinit();
 
     var running = true;
     while (running) {
@@ -79,10 +81,10 @@ pub fn main() !void {
                 .key_up, .key_down => |e| try Input.update(e),
                 .quit, .terminating => running = false,
                 .window_pixel_size_changed => |e| {
-                    camera.setViewportSize(e.width, e.height);
+                    Game.camera.setViewportSize(e.width, e.height);
                 },
                 .mouse_wheel => |e| {
-                    camera.z += e.scroll_y * 0.05;
+                    Game.camera.z += e.scroll_y * 0.05;
                 },
                 else => {},
             }
@@ -91,8 +93,8 @@ pub fn main() !void {
         if (!running or Input.isPressed(.escape)) break;
 
         try renderer.renderFillRect(null);
-        try level.update(frame_delay);
-        try level.render();
+        Game.update(frame_delay);
+        Game.render();
 
         try renderer.present();
     }

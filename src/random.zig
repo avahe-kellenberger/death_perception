@@ -1,6 +1,7 @@
 const std = @import("std");
 
 pub var random: std.Random = undefined;
+var prng: std.Random.DefaultPrng = undefined;
 
 pub fn init() void {
     const seed = blk: {
@@ -8,8 +9,7 @@ pub fn init() void {
         std.posix.getrandom(std.mem.asBytes(&s)) catch unreachable;
         break :blk s;
     };
-
-    var prng = std.Random.DefaultPrng.init(seed);
+    prng = .init(seed);
     random = prng.random();
 }
 

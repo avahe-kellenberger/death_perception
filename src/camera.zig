@@ -6,51 +6,61 @@ const FPoint = sdl.rect.FPoint;
 
 const Size = @import("size.zig").Size;
 
+const DEFAULT_Z: f32 = 1.0;
+
 pub const Camera = struct {
     pub const Self = @This();
 
-    loc: FPoint,
-    viewport: FRect,
-    half_viewport_size: Size(f32),
+    /// Center of camera (in game coordinates)
+    _loc: FPoint,
+
+    // Camera size (in screen coordinates)
+    _size: Size(f32),
 
     // Camera zoom
-    z: f32 = 0,
+    _z: f32 = 0,
+
+    /// Outer bounds of camera (in game coordinates)
+    viewport: FRect = .{ .x = 0, .y = 0, .w = 0, .h = 0 },
 
     pub fn init(loc: FPoint, size: Size(f32)) Camera {
-        const viewport: FRect = .{
-            .x = loc.x - size.w * 0.5,
-            .y = loc.y - size.h * 0.5,
-            .w = size.w,
-            .h = size.h,
+        var cam: Camera = .{
+            ._loc = loc,
+            ._size = size,
         };
+        cam.updateViewport();
+        return cam;
+    }
 
-        return .{
-            .loc = loc,
-            .viewport = viewport,
-            .half_viewport_size = .{
-                .w = viewport.w * 0.5,
-                .h = viewport.h * 0.5,
-            },
-        };
+    pub fn getScale(self: *Self) ?f32 {
+        const relative_z = DEFAULT_Z - self._z;
+        if (relative_z <= 0) return null;
+        return 1.0 / relative_z;
     }
 
     pub fn centerOnPoint(self: *Self, p: FPoint) void {
-        self.loc = p;
-        self.viewport.x = p.x - self.half_viewport_size.w;
-        self.viewport.y = p.y - self.half_viewport_size.h;
+        self._loc = p;
+        self.updateViewport();
     }
 
-    pub fn setViewportSize(self: *Self, w: i32, h: i32) void {
-        self.viewport.w = @floatFromInt(w);
-        self.viewport.h = @floatFromInt(h);
+    pub fn setSize(self: *Self, w: f32, h: f32) void {
+        self._size.w = w;
+        self._size.h = h;
+        self.updateViewport();
+    }
 
-        self.half_viewport_size = .{
-            .w = self.viewport.w * 0.5,
-            .h = self.viewport.h * 0.5,
-        };
+    pub fn zoom(self: *Self, z: f32) void {
+        self._z += z;
+        self.updateViewport();
+    }
 
-        self.viewport.x = self.loc.x - self.half_viewport_size.w;
-        self.viewport.y = self.loc.y - self.half_viewport_size.h;
+    fn updateViewport(self: *Self) void {
+        if (self.getScale()) |scale| {
+            self.viewport.w = self._size.w / scale;
+            self.viewport.h = self._size.h / scale;
+            self.viewport.x = self._loc.x - (self.viewport.w * 0.5);
+            self.viewport.y = self._loc.y - (self.viewport.h * 0.5);
+        }
     }
 
     pub fn intersects(self: *Self, rect: FRect) bool {

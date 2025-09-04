@@ -9,6 +9,7 @@ const FPoint = sdl.rect.FPoint;
 const Game = @import("game.zig");
 const rand = @import("random.zig").rand;
 const Array2D = @import("array_2d.zig").Array2D;
+const ArrayWindow = @import("array_2d.zig").ArrayWindow;
 const Spritesheet = @import("spritesheet.zig").Spritesheet;
 
 const Tile = struct {
@@ -271,36 +272,41 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
         }
 
         pub fn render(self: *Self) void {
+            const window: ArrayWindow = .{
+                .x = @as(usize, @intFromFloat(@max(0, @floor(Game.camera.viewport.x / self.tile_size)))),
+                .y = @as(usize, @intFromFloat(@max(0, @floor(Game.camera.viewport.y / self.tile_size)))),
+                .w = @as(usize, @intFromFloat(@ceil(Game.camera.viewport.w / self.tile_size))) + 1,
+                .h = @as(usize, @intFromFloat(@ceil(Game.camera.viewport.h / self.tile_size))) + 1,
+            };
+
             // Render floor tiles
             {
-                var iter = self.tiles.iterator();
+                var iter = self.tiles.window(window);
                 while (iter.next()) |e| {
                     if (e.t.floor_image_index >= 0) {
                         const sprite_rect = self.floor_tiles_sheet.sprites[@intCast(e.t.floor_image_index)];
-                        var dest: FRect = .{
+                        Game.renderTexture(self.floor_tiles_sheet.sheet, sprite_rect, .{
                             .x = calcTileLocation(e.x, self.tile_size),
                             .y = calcTileLocation(e.y, self.tile_size),
                             .w = sprite_rect.w,
                             .h = sprite_rect.h,
-                        };
-                        Game.renderTexture(self.floor_tiles_sheet.sheet, sprite_rect, &dest);
+                        });
                     }
                 }
             }
 
             // Render wall tiles
             {
-                var iter = self.tiles.iterator();
+                var iter = self.tiles.window(window);
                 while (iter.next()) |e| {
                     if (e.t.wall_image_index >= 0) {
                         const sprite_rect = self.wall_tiles_sheet.sprites[@intCast(e.t.wall_image_index)];
-                        var dest: FRect = .{
+                        Game.renderTexture(self.wall_tiles_sheet.sheet, sprite_rect, .{
                             .x = calcTileLocation(e.x, self.tile_size),
                             .y = calcTileLocation(e.y, self.tile_size),
                             .w = sprite_rect.w,
                             .h = sprite_rect.h,
-                        };
-                        Game.renderTexture(self.wall_tiles_sheet.sheet, sprite_rect, &dest);
+                        });
                     }
                 }
             }

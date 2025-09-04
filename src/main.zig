@@ -36,14 +36,6 @@ pub fn main() !void {
     const renderer = initResult.renderer;
     const window = initResult.window;
 
-    // TODO: This doesn't seem to affect fps?
-    try renderer.setClipRect(.{
-        .x = 0,
-        .y = 0,
-        .w = screen_width,
-        .h = screen_height,
-    });
-
     const alloc = std.heap.smp_allocator;
 
     var display = try sdl.video.Display.getPrimaryDisplay();
@@ -81,10 +73,10 @@ pub fn main() !void {
                 .key_up, .key_down => |e| try Input.update(e),
                 .quit, .terminating => running = false,
                 .window_pixel_size_changed => |e| {
-                    Game.camera.setViewportSize(e.width, e.height);
+                    Game.camera.setSize(@floatFromInt(e.width), @floatFromInt(e.height));
                 },
                 .mouse_wheel => |e| {
-                    Game.camera.z += e.scroll_y * 0.05;
+                    Game.camera.zoom(e.scroll_y * 0.05);
                 },
                 else => {},
             }
@@ -92,7 +84,7 @@ pub fn main() !void {
 
         if (!running or Input.isPressed(.escape)) break;
 
-        try renderer.renderFillRect(null);
+        try renderer.clear();
         Game.update(frame_delay);
         Game.render();
 

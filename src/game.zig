@@ -26,8 +26,6 @@ pub var state: GameState = .in_game;
 pub var renderer: Renderer = undefined;
 pub var camera: Camera = undefined;
 
-var offset: FPoint = .{ .x = 0, .y = 0 };
-
 var level: Level1 = undefined;
 
 pub fn init(alloc: Allocator, _renderer: Renderer, _camera: Camera) void {
@@ -86,20 +84,13 @@ pub fn render() void {
             // TODO
         },
         .in_game => {
-            const relative_z = 1.0 - camera.z;
-            if (relative_z <= 0) return;
+            if (camera.getScale()) |scale| {
+                renderer.setScale(scale, scale) catch unreachable;
 
-            offset = .{
-                .x = -1 * (camera.loc.x - camera.half_viewport_size.w * relative_z),
-                .y = -1 * (camera.loc.y - camera.half_viewport_size.h * relative_z),
-            };
+                level.render();
 
-            const inversedScalar = 1.0 / relative_z;
-            renderer.setScale(inversedScalar, inversedScalar) catch unreachable;
-
-            level.render();
-
-            renderer.setScale(relative_z, relative_z) catch unreachable;
+                renderer.setScale(1, 1) catch unreachable;
+            }
         },
         .paused => {
             // TODO
@@ -119,16 +110,12 @@ pub fn loadTexture(path: [:0]const u8, mode: sdl.surface.ScaleMode) Texture {
     return tex;
 }
 
-pub fn renderTexture(t: Texture, src: ?FRect, dst: ?*FRect) void {
-    if (dst) |d| if (camera.intersects(d.*)) {
-        // NOTE: I assume this is better than creating an entirely new rect,
-        // but it is odd needing to pass in a pointer.
-        d.x += offset.x;
-        d.y += offset.y;
+pub fn renderTexture(t: Texture, src: ?FRect, dst: FRect) void {
+    if (camera.intersects(dst)) {
+        var r = dst;
+        r.x -= camera.viewport.x;
+        r.y -= camera.viewport.y;
 
-        renderer.renderTexture(t, src, d.*) catch unreachable;
-
-        d.x -= offset.x;
-        d.y -= offset.y;
-    };
+        renderer.renderTexture(t, src, r) catch unreachable;
+    }
 }

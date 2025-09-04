@@ -49,12 +49,11 @@ pub const Player = struct {
     }
 
     pub fn render(self: *Self) void {
-        var dest: FRect = .{
+        Game.renderTexture(self.image, null, .{
             .x = self.loc.x - self.image_size.x * 0.5,
             .y = self.loc.y - self.image_size.y * 0.5,
             .w = self.image_size.x,
             .h = self.image_size.y,
-        };
-        Game.renderTexture(self.image, null, &dest);
+        });
     }
 };

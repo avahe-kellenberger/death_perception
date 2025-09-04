@@ -1,13 +1,25 @@
 const std = @import("std");
 
+pub const ArrayWindow = struct { x: usize, y: usize, w: usize, h: usize };
+
 pub fn Array2D(T: type, comptime width: usize, comptime height: usize) type {
+    comptime {
+        if (width == 0) @compileError("width cannot be zero");
+        if (height == 0) @compileError("height cannot be zero");
+    }
     return struct {
         pub const Self = @This();
 
         values: [width * height]T = undefined,
 
-        pub fn init() Array2D(T, width, height) {
+        pub fn init() Self {
             return .{};
+        }
+
+        pub fn initWith(default: T) Self {
+            var t: Self = .{};
+            @memset(&t.values, default);
+            return t;
         }
 
         pub fn get(self: *Self, x: usize, y: usize) *T {
@@ -24,7 +36,31 @@ pub fn Array2D(T: type, comptime width: usize, comptime height: usize) type {
         }
 
         pub fn iterator(self: *Self) Iterator(T, width, height) {
-            return Iterator(T, width, height).init(self);
+            return Iterator(T, width, height).init(self, .{
+                .x = 0,
+                .y = 0,
+                .w = width,
+                .h = height,
+            });
+        }
+
+        pub fn window(
+            self: *Self,
+            win: ArrayWindow,
+        ) Iterator(T, width, height) {
+            const x = @min(win.x, width);
+            const y = @min(win.y, height);
+            const w = @min(win.w, width - x);
+            const h = if (w != 0) @min(win.h, height - y) else 0;
+            return Iterator(T, width, height).init(
+                self,
+                .{
+                    .x = x,
+                    .y = y,
+                    .w = w,
+                    .h = h,
+                },
+            );
         }
     };
 }
@@ -36,32 +72,51 @@ fn Iterator(comptime T: type, comptime width: usize, comptime height: usize) typ
         pub const Self = @This();
 
         arr: *Array2D(T, width, height),
-        i: u64 = 0,
 
-        pub fn init(arr: *Array2D(T, width, height)) Iterator(T, width, height) {
-            return .{ .arr = arr };
+        // Window
+        win_x: usize, // inclusive
+        win_max_x: usize, // exclusive
+        win_max_y: usize, // exclusive
+
+        // State
+        x: usize,
+        y: usize,
+
+        pub fn init(arr: *Array2D(T, width, height), window: ArrayWindow) Iterator(T, width, height) {
+            return .{
+                .arr = arr,
+                .win_x = window.x,
+                .win_max_x = window.x + window.w,
+                .win_max_y = window.y + window.h,
+                .x = window.x,
+                .y = window.y,
+            };
         }
 
         pub fn next(self: *Self) ?Result {
-            defer self.i += 1;
+            defer self.x += 1;
 
-            const x: usize = std.math.mod(u64, self.i, width) catch unreachable;
-            const y: usize = @divTrunc(self.i, width);
-            if (x >= width or y >= height) return null;
+            if (self.x >= self.win_max_x) {
+                self.x = self.win_x;
+                self.y += 1;
+            }
+            if (self.y >= self.win_max_y) {
+                return null;
+            }
 
             return .{
-                .t = self.arr.get(x, y),
-                .x = x,
-                .y = y,
+                .t = self.arr.get(self.x, self.y),
+                .x = self.x,
+                .y = self.y,
             };
         }
     };
 }
 
-test {
+test "init" {
     const Tile = struct {
-        x: usize = 0,
-        y: usize = 0,
+        x: usize = 123,
+        y: usize = 456,
     };
 
     var list: Array2D(Tile, 3, 4) = .init();
@@ -69,7 +124,69 @@ test {
     while (iter.next()) |e| {
         // Initialize all tiles
         e.t.* = .{};
-        try std.testing.expectEqual(e.t.x, 0);
-        try std.testing.expectEqual(e.t.y, 0);
+        try std.testing.expectEqual(e.t.x, 123);
+        try std.testing.expectEqual(e.t.y, 456);
     }
+}
+
+test "initWith" {
+    var list: Array2D(u32, 3, 4) = .initWith(42);
+    var iter = list.iterator();
+    while (iter.next()) |e| {
+        try std.testing.expectEqual(e.t.*, 42);
+    }
+}
+
+test "iterate over area" {
+    var list: Array2D(u32, 3, 4) = .initWith(0);
+    var iter = list.window(.{ .x = 1, .y = 0, .w = 1, .h = 2 });
+    var count: usize = 0;
+    while (iter.next()) |_| {
+        count += 1;
+    }
+    try std.testing.expectEqual(count, 2);
+}
+
+test "no columns" {
+    var list: Array2D(u32, 3, 4) = .initWith(0);
+    var iter = list.window(.{ .x = 0, .y = 0, .w = 0, .h = 100 });
+    while (iter.next()) |_| {
+        try std.testing.expect(false);
+    }
+}
+
+test "no rows" {
+    var list: Array2D(u32, 3, 4) = .initWith(0);
+    var iter = list.window(.{ .x = 0, .y = 0, .w = 100, .h = 0 });
+    while (iter.next()) |_| {
+        try std.testing.expect(false);
+    }
+}
+
+test "out of bounds" {
+    var list: Array2D(u32, 3, 4) = .initWith(0);
+    var iter = list.window(.{ .x = 5, .y = 0, .w = 10, .h = 10 });
+    while (iter.next()) |_| {
+        try std.testing.expect(false);
+    }
+}
+
+test "1 column" {
+    var list: Array2D(u32, 3, 4) = .initWith(0);
+    var iter = list.window(.{ .x = 2, .y = 0, .w = 10, .h = 10 });
+    var count: usize = 0;
+    while (iter.next()) |_| {
+        count += 1;
+    }
+    try std.testing.expectEqual(count, 4);
+}
+
+test "1 row" {
+    var list: Array2D(u32, 3, 4) = .initWith(0);
+    var iter = list.window(.{ .x = 1, .y = 3, .w = 10, .h = 10 });
+    var count: usize = 0;
+    while (iter.next()) |_| {
+        count += 1;
+    }
+    try std.testing.expectEqual(count, 2);
 }

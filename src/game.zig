@@ -25,6 +25,7 @@ pub const GameState = enum {
 pub var state: GameState = .in_game;
 pub var renderer: Renderer = undefined;
 pub var camera: Camera = undefined;
+pub var bg_color: sdl.pixels.Color = .{};
 
 var level: Level1 = undefined;
 
@@ -87,6 +88,8 @@ pub fn render() void {
             if (camera.getScale()) |scale| {
                 renderer.setScale(scale, scale) catch unreachable;
 
+                renderer.setDrawColor(bg_color) catch unreachable;
+                renderer.clear() catch unreachable;
                 level.render();
 
                 renderer.setScale(1, 1) catch unreachable;
@@ -118,4 +121,23 @@ pub fn renderTexture(t: Texture, src: ?FRect, dst: FRect) void {
 
         renderer.renderTexture(t, src, r) catch unreachable;
     }
+}
+
+pub fn fillRect(dst: FRect, color: sdl.pixels.Color) void {
+    if (camera.intersects(dst)) if (camera.getScale()) |_| {
+        var r = dst;
+        r.x -= camera.viewport.x;
+        r.y -= camera.viewport.y;
+
+        renderer.setDrawColor(color) catch unreachable;
+        renderer.renderFillRect(r) catch unreachable;
+    };
+}
+
+pub fn setBlendMode(mode: sdl.blend_mode.Mode) void {
+    renderer.setDrawBlendMode(mode) catch unreachable;
+}
+
+pub fn resetBlendMode() void {
+    renderer.setDrawBlendMode(.none) catch unreachable;
 }

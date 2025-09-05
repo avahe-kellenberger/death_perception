@@ -5,6 +5,7 @@ const sdl = @import("sdl3");
 const Renderer = sdl.render.Renderer;
 const FRect = sdl.rect.FRect;
 const FPoint = sdl.rect.FPoint;
+const IPoint = sdl.rect.IPoint;
 
 const Game = @import("game.zig");
 const rand = @import("random.zig").rand;
@@ -223,7 +224,8 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
                         22, 150, 214, 246 => 3,
                         254 => 4,
                         208, 212, 240, 244 => 5,
-                        else => 0,
+                        // This is usually image index 0, but we don't need to draw the empty tile.
+                        else => -1,
                     };
                 }
             }
@@ -313,8 +315,87 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
         }
 
         fn calcTileLocation(tile_coord: usize, tile_size: f32) f32 {
-            const tile_coord_float: f32 = @floatFromInt(tile_coord);
-            return @floor(tile_coord_float * tile_size);
+            return @as(f32, @floatFromInt(tile_coord)) * tile_size;
         }
+
+        const TileHelpers = struct {
+            current_tile: i32,
+            tile_direction: f32,
+            dt: f32,
+            delta_tile: f32,
+        };
+
+        fn getTileHelpers(self: *Self, position: f32, ray_dist: f32) !TileHelpers {
+            const current_tile = @floor(position / self.tile_size) + 1;
+
+            var direction: f32 = 0;
+            var dt: f32 = 0;
+
+            if (direction > 0) {
+                direction = 1;
+                dt = ((current_tile + 0) * self.tile_size - position) / ray_dist;
+            } else {
+                direction = -1;
+                dt = ((current_tile - 1) * self.tile_size - position) / ray_dist;
+            }
+
+            return TileHelpers{
+                .current_tile = @intFromFloat(current_tile),
+                .direction = direction,
+                .dt = dt,
+                .delta_tile = direction * self.tile_size / direction,
+            };
+        }
+
+        const TileData = struct {
+            tile: Tile,
+            x: u32,
+            y: u32,
+        };
+
+        // Caller owns the returned data.
+        // pub fn raycast(self: *Self, loc: FPoint, vector: FPoint) []TileData {
+        //     const helpers_x = self.getTileHelpers(loc.x, vector.x);
+        //     const helpers_y = self.getTileHelpers(loc.x, vector.y);
+        //
+        //     const tile_x = helpers_x.current_tile;
+        //     const tile_y = helpers_y.current_tile;
+        //     var tile: IPoint = .{
+        //         .x = helpers_x.current_tile,
+        //         .y = helpers_y.current_tile,
+        //     };
+        //
+        //     const tile_direction_x = helpers_x.tile_direction;
+        //     var delta_time_x = helpers_x.dt;
+        //     const delta_tile_x = helpers_x.delta_tile;
+        //
+        //     const tile_direction_y = helpers_y.tile_direction;
+        //     var delta_time_y = helpers_y.dt;
+        //     const delta_tile_y = helpers_y.delta_tile;
+        //
+        //     var total_distance: f32 = 0;
+        //
+        //     var tiles: std.ArrayList(TileData) = .empty;
+        //     while (tile_x > 0 and tile_x <= self.width and tile_y > 0 and tile_y <= self.height) {
+        //         self[tile_y][tile_x] = true;
+        //         tiles.append(self.alloc, .{});
+        //         // mark(ray.start_x + ray.dir_x * total_distance, ray.start_y + ray.dir_y * total_distance);
+        //
+        //         if (delta_time_x < delta_time_y) {
+        //             tile_x += tile_direction_x;
+        //             const delta = delta_time_x;
+        //             total_distance += delta;
+        //             delta_time_x += delta_tile_x - delta;
+        //             delta_time_y -= delta;
+        //         } else {
+        //             tile_y += tile_direction_y;
+        //             const delta = delta_time_y;
+        //             total_distance += delta;
+        //             delta_time_x -= delta;
+        //             delta_time_y += delta_tile_y - delta;
+        //         }
+        //     }
+        //     return tiles.toOwnedSlice(self.alloc);
+        // }
     };
 }

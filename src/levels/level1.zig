@@ -5,12 +5,17 @@ const sdl = @import("sdl3");
 const Renderer = sdl.render.Renderer;
 const Texture = sdl.render.Texture;
 const FPoint = sdl.rect.FPoint;
+const FRect = sdl.rect.FRect;
 
 const Game = @import("../game.zig");
+const Input = @import("../input.zig");
 const Player = @import("../player.zig").Player;
 const Map = @import("../map.zig").Map;
 const Spritesheet = @import("../spritesheet.zig").Spritesheet;
-const Camera = @import("../camera.zig").Camera;
+
+const GREEN: sdl.pixels.Color = .{ .r = 0, .g = 255, .b = 0, .a = 100 };
+const RED: sdl.pixels.Color = .{ .r = 255, .g = 0, .b = 0, .a = 100 };
+const BLUE: sdl.pixels.Color = .{ .r = 0, .g = 0, .b = 255, .a = 100 };
 
 pub const Level1 = struct {
     pub const Self = @This();
@@ -23,7 +28,14 @@ pub const Level1 = struct {
     player: Player,
     map: Map(144, 144),
 
+    // NOTE: Testing code below, can remove later
+    start_tile: ?FRect = null,
+    end_tile: ?FRect = null,
+
     pub fn init(alloc: Allocator) Level1 {
+        // Map floor color so we can ignore drawing "empty" tiles
+        Game.bg_color = .{ .r = 139, .g = 155, .b = 180, .a = 255 };
+
         floor_tiles_image = Game.loadTexture("./assets/images/floor_tiles.png", .nearest);
         wall_tiles_image = Game.loadTexture("./assets/images/wall_tiles.png", .nearest);
 
@@ -55,6 +67,29 @@ pub const Level1 = struct {
 
     pub fn render(self: *Self) void {
         self.map.render();
+
+        if (Input.getButtonState(.left) == .just_pressed) {
+            self.start_tile = self.getHoveredTileBounds();
+        } else if (Input.getButtonState(.right) == .just_pressed) {
+            self.end_tile = self.getHoveredTileBounds();
+        }
+
+        // NOTE: Allows for transparency (should this just be our default?)
+        Game.setBlendMode(.blend);
+        if (self.start_tile) |t| Game.fillRect(t, GREEN);
+        if (self.end_tile) |t| Game.fillRect(t, RED);
+        Game.resetBlendMode();
+
         self.player.render();
+    }
+
+    fn getHoveredTileBounds(self: *Self) FRect {
+        const mouse_world_coord: FPoint = Game.camera.screenToWorld(Input.mouse.loc);
+        return .{
+            .x = @floor(mouse_world_coord.x / self.map.tile_size) * self.map.tile_size,
+            .y = @floor(mouse_world_coord.y / self.map.tile_size) * self.map.tile_size,
+            .w = self.map.tile_size,
+            .h = self.map.tile_size,
+        };
     }
 };

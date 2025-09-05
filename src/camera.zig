@@ -66,4 +66,12 @@ pub const Camera = struct {
     pub fn intersects(self: *Self, rect: FRect) bool {
         return self.viewport.hasIntersection(rect);
     }
+
+    pub fn screenToWorld(self: *Self, p: FPoint) FPoint {
+        const relative_z = DEFAULT_Z - self._z;
+        return .{
+            .x = (p.x * relative_z) + self._loc.x - self.viewport.w * 0.5,
+            .y = (p.y * relative_z) + self._loc.y - self.viewport.h * 0.5,
+        };
+    }
 };

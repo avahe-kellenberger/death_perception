@@ -12,11 +12,7 @@ pub fn Array2D(T: type, comptime width: usize, comptime height: usize) type {
 
         values: [width * height]T = undefined,
 
-        pub fn init() Self {
-            return .{};
-        }
-
-        pub fn initWith(default: T) Self {
+        pub fn init(default: T) Self {
             var t: Self = .{};
             @memset(&t.values, default);
             return t;
@@ -114,23 +110,7 @@ fn Iterator(comptime T: type, comptime width: usize, comptime height: usize) typ
 }
 
 test "init" {
-    const Tile = struct {
-        x: usize = 123,
-        y: usize = 456,
-    };
-
-    var list: Array2D(Tile, 3, 4) = .init();
-    var iter = list.iterator();
-    while (iter.next()) |e| {
-        // Initialize all tiles
-        e.t.* = .{};
-        try std.testing.expectEqual(e.t.x, 123);
-        try std.testing.expectEqual(e.t.y, 456);
-    }
-}
-
-test "initWith" {
-    var list: Array2D(u32, 3, 4) = .initWith(42);
+    var list: Array2D(u32, 3, 4) = .init(42);
     var iter = list.iterator();
     while (iter.next()) |e| {
         try std.testing.expectEqual(e.t.*, 42);
@@ -138,7 +118,7 @@ test "initWith" {
 }
 
 test "iterate over area" {
-    var list: Array2D(u32, 3, 4) = .initWith(0);
+    var list: Array2D(u32, 3, 4) = .init(0);
     var iter = list.window(.{ .x = 1, .y = 0, .w = 1, .h = 2 });
     var count: usize = 0;
     while (iter.next()) |_| {
@@ -148,7 +128,7 @@ test "iterate over area" {
 }
 
 test "no columns" {
-    var list: Array2D(u32, 3, 4) = .initWith(0);
+    var list: Array2D(u32, 3, 4) = .init(0);
     var iter = list.window(.{ .x = 0, .y = 0, .w = 0, .h = 100 });
     while (iter.next()) |_| {
         try std.testing.expect(false);
@@ -156,7 +136,7 @@ test "no columns" {
 }
 
 test "no rows" {
-    var list: Array2D(u32, 3, 4) = .initWith(0);
+    var list: Array2D(u32, 3, 4) = .init(0);
     var iter = list.window(.{ .x = 0, .y = 0, .w = 100, .h = 0 });
     while (iter.next()) |_| {
         try std.testing.expect(false);
@@ -164,7 +144,7 @@ test "no rows" {
 }
 
 test "out of bounds" {
-    var list: Array2D(u32, 3, 4) = .initWith(0);
+    var list: Array2D(u32, 3, 4) = .init(0);
     var iter = list.window(.{ .x = 5, .y = 0, .w = 10, .h = 10 });
     while (iter.next()) |_| {
         try std.testing.expect(false);
@@ -172,7 +152,7 @@ test "out of bounds" {
 }
 
 test "1 column" {
-    var list: Array2D(u32, 3, 4) = .initWith(0);
+    var list: Array2D(u32, 3, 4) = .init(0);
     var iter = list.window(.{ .x = 2, .y = 0, .w = 10, .h = 10 });
     var count: usize = 0;
     while (iter.next()) |_| {
@@ -182,7 +162,7 @@ test "1 column" {
 }
 
 test "1 row" {
-    var list: Array2D(u32, 3, 4) = .initWith(0);
+    var list: Array2D(u32, 3, 4) = .init(0);
     var iter = list.window(.{ .x = 1, .y = 3, .w = 10, .h = 10 });
     var count: usize = 0;
     while (iter.next()) |_| {

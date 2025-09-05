@@ -41,7 +41,7 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
                 .alloc = alloc,
                 .floor_tiles_sheet = floor_tiles_sheet,
                 .wall_tiles_sheet = wall_tiles_sheet,
-                .tiles = Array2D(Tile, width, height).init(),
+                .tiles = Array2D(Tile, width, height).init(Tile{}),
                 .tile_size = tile_size,
             };
 
@@ -117,7 +117,7 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
 
         /// Eliminate any smaller secluded rooms that were generated
         fn fillSmallerRooms(self: *Self) !void {
-            var visited = Array2D(bool, width, height).init();
+            var visited = Array2D(bool, width, height).init(false);
 
             var rooms: std.ArrayList([]Coordinate) = .empty;
             defer {

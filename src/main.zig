@@ -14,6 +14,7 @@ pub fn main() !void {
     defer sdl.shutdown();
 
     // Initialize SDL with subsystems you need here.
+
     const init_flags = sdl.InitFlags{
         .video = true,
         .joystick = true,
@@ -21,6 +22,14 @@ pub fn main() !void {
     };
     try sdl.init(init_flags);
     defer sdl.quit(init_flags);
+
+    try sdl.net.init();
+    defer sdl.net.quit();
+
+    try sdl.ttf.init();
+    defer sdl.ttf.quit();
+
+    // End of SDL init
 
     Input.init(std.heap.smp_allocator);
     defer Input.deinit();

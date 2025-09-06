@@ -19,6 +19,8 @@ pub fn build(b: *std.Build) void {
         // Lib options.
         // .callbacks = false,
         .ext_image = true,
+        .ext_net = true,
+        .ext_ttf = true,
 
         // Options passed directly to https://github.com/castholm/SDL (SDL3 C Bindings):
         // .c_sdl_preferred_linkage = .static,

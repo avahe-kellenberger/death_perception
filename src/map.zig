@@ -13,11 +13,17 @@ const Array2D = @import("array_2d.zig").Array2D;
 const ArrayWindow = @import("array_2d.zig").ArrayWindow;
 const Spritesheet = @import("spritesheet.zig").Spritesheet;
 
-const Tile = struct {
+pub const Tile = struct {
     floor_image_index: isize = -1,
     wall_image_index: isize = -1,
     neighbor_bit_sum: u8 = 0,
     is_wall: bool = false,
+};
+
+pub const TileData = struct {
+    tile: *Tile,
+    x: u32,
+    y: u32,
 };
 
 pub fn Map(comptime width: usize, comptime height: usize) type {
@@ -318,84 +324,50 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
             return @as(f32, @floatFromInt(tile_coord)) * tile_size;
         }
 
-        const TileHelpers = struct {
-            current_tile: i32,
-            tile_direction: f32,
-            dt: f32,
-            delta_tile: f32,
-        };
+        /// Finds all tiles intersecting with the raycast.
+        /// Caller owns the returned data.
+        pub fn raycast(self: *Self, start: FPoint, end: FPoint) []TileData {
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
 
-        fn getTileHelpers(self: *Self, position: f32, ray_dist: f32) !TileHelpers {
-            const current_tile = @floor(position / self.tile_size) + 1;
+            const steps: usize = @intFromFloat(@max(@abs(dx), @abs(dy)) / self.tile_size + 1);
 
-            var direction: f32 = 0;
-            var dt: f32 = 0;
+            const x_increment = dx / @as(f32, @floatFromInt(steps));
+            const y_increment = dy / @as(f32, @floatFromInt(steps));
 
-            if (direction > 0) {
-                direction = 1;
-                dt = ((current_tile + 0) * self.tile_size - position) / ray_dist;
-            } else {
-                direction = -1;
-                dt = ((current_tile - 1) * self.tile_size - position) / ray_dist;
+            var current_x = start.x;
+            var current_y = start.y;
+
+            var tiles_hit: std.ArrayList(TileData) = .empty;
+            defer tiles_hit.deinit(self.alloc);
+
+            // Add + 1 to ensure the last tile is found.
+            outer: for (0..steps + 1) |_| {
+                const tile_x: u32 = @intFromFloat(current_x / self.tile_size);
+                const tile_y: u32 = @intFromFloat(current_y / self.tile_size);
+                defer current_x += x_increment;
+                defer current_y += y_increment;
+
+                if (tile_x < 0 or tile_x >= width or tile_y < 0 or tile_y >= height) {
+                    // Out of bounds
+                    break;
+                }
+
+                const tile = self.tiles.get(tile_x, tile_y);
+                if (tile.is_wall) {
+                    for (tiles_hit.items) |hit| {
+                        // Make sure we don't add duplicate tiles.
+                        if (hit.x == tile_x and hit.y == tile_y) continue :outer;
+                    }
+
+                    tiles_hit.append(self.alloc, .{
+                        .tile = tile,
+                        .x = tile_x,
+                        .y = tile_y,
+                    }) catch unreachable;
+                }
             }
-
-            return TileHelpers{
-                .current_tile = @intFromFloat(current_tile),
-                .direction = direction,
-                .dt = dt,
-                .delta_tile = direction * self.tile_size / direction,
-            };
+            return tiles_hit.toOwnedSlice(self.alloc) catch unreachable;
         }
-
-        const TileData = struct {
-            tile: Tile,
-            x: u32,
-            y: u32,
-        };
-
-        // Caller owns the returned data.
-        // pub fn raycast(self: *Self, loc: FPoint, vector: FPoint) []TileData {
-        //     const helpers_x = self.getTileHelpers(loc.x, vector.x);
-        //     const helpers_y = self.getTileHelpers(loc.x, vector.y);
-        //
-        //     const tile_x = helpers_x.current_tile;
-        //     const tile_y = helpers_y.current_tile;
-        //     var tile: IPoint = .{
-        //         .x = helpers_x.current_tile,
-        //         .y = helpers_y.current_tile,
-        //     };
-        //
-        //     const tile_direction_x = helpers_x.tile_direction;
-        //     var delta_time_x = helpers_x.dt;
-        //     const delta_tile_x = helpers_x.delta_tile;
-        //
-        //     const tile_direction_y = helpers_y.tile_direction;
-        //     var delta_time_y = helpers_y.dt;
-        //     const delta_tile_y = helpers_y.delta_tile;
-        //
-        //     var total_distance: f32 = 0;
-        //
-        //     var tiles: std.ArrayList(TileData) = .empty;
-        //     while (tile_x > 0 and tile_x <= self.width and tile_y > 0 and tile_y <= self.height) {
-        //         self[tile_y][tile_x] = true;
-        //         tiles.append(self.alloc, .{});
-        //         // mark(ray.start_x + ray.dir_x * total_distance, ray.start_y + ray.dir_y * total_distance);
-        //
-        //         if (delta_time_x < delta_time_y) {
-        //             tile_x += tile_direction_x;
-        //             const delta = delta_time_x;
-        //             total_distance += delta;
-        //             delta_time_x += delta_tile_x - delta;
-        //             delta_time_y -= delta;
-        //         } else {
-        //             tile_y += tile_direction_y;
-        //             const delta = delta_time_y;
-        //             total_distance += delta;
-        //             delta_time_x -= delta;
-        //             delta_time_y += delta_tile_y - delta;
-        //         }
-        //     }
-        //     return tiles.toOwnedSlice(self.alloc);
-        // }
     };
 }

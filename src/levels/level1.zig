@@ -13,6 +13,8 @@ const Player = @import("../player.zig").Player;
 const Map = @import("../map.zig").Map;
 const Spritesheet = @import("../spritesheet.zig").Spritesheet;
 
+const TileData = @import("../map.zig").TileData;
+
 const GREEN: sdl.pixels.Color = .{ .r = 0, .g = 255, .b = 0, .a = 100 };
 const RED: sdl.pixels.Color = .{ .r = 255, .g = 0, .b = 0, .a = 100 };
 const BLUE: sdl.pixels.Color = .{ .r = 0, .g = 0, .b = 255, .a = 100 };
@@ -29,8 +31,9 @@ pub const Level1 = struct {
     map: Map(144, 144),
 
     // NOTE: Testing code below, can remove later
-    start_tile: ?FRect = null,
-    end_tile: ?FRect = null,
+    raycast_start_loc: ?FPoint = null,
+    raycast_end_loc: ?FPoint = null,
+    raycast_tiles: ?[]TileData = null,
 
     pub fn init(alloc: Allocator) Level1 {
         // Map floor color so we can ignore drawing "empty" tiles
@@ -69,15 +72,47 @@ pub const Level1 = struct {
         self.map.render();
 
         if (Input.getButtonState(.left) == .just_pressed) {
-            self.start_tile = self.getHoveredTileBounds();
-        } else if (Input.getButtonState(.right) == .just_pressed) {
-            self.end_tile = self.getHoveredTileBounds();
-        }
+            self.raycast_start_loc = Game.camera.screenToWorld(Input.mouse.loc);
+            if (self.raycast_tiles) |t| {
+                self.alloc.free(t);
+                self.raycast_tiles = null;
+            }
+        } else if (self.raycast_start_loc) |start| if (Input.getButtonState(.right) == .just_pressed) {
+            const end = Game.camera.screenToWorld(Input.mouse.loc);
+            self.raycast_end_loc = end;
+
+            if (self.raycast_tiles) |t| {
+                self.alloc.free(t);
+                self.raycast_tiles = null;
+            }
+
+            self.raycast_tiles = self.map.raycast(start, end);
+            std.log.err("Raycast found {} tiles", .{self.raycast_tiles.?.len});
+        };
 
         // NOTE: Allows for transparency (should this just be our default?)
         Game.setBlendMode(.blend);
-        if (self.start_tile) |t| Game.fillRect(t, GREEN);
-        if (self.end_tile) |t| Game.fillRect(t, RED);
+        // if (self.start_tile) |t| Game.fillRect(t, GREEN);
+        // if (self.end_tile) |t| Game.fillRect(t, RED);
+
+        if (self.raycast_start_loc) |start| {
+            Game.fillRect(.{ .x = start.x - 1, .y = start.y - 1, .w = 2, .h = 2 }, GREEN);
+        }
+
+        if (self.raycast_end_loc) |end| {
+            Game.fillRect(.{ .x = end.x - 1, .y = end.y - 1, .w = 2, .h = 2 }, RED);
+        }
+
+        if (self.raycast_tiles) |tiles| for (tiles) |t| {
+            const rect: FRect = .{
+                .x = @as(f32, @floatFromInt(t.x)) * 16.0,
+                .y = @as(f32, @floatFromInt(t.y)) * 16.0,
+                .w = self.map.tile_size,
+                .h = self.map.tile_size,
+            };
+            Game.fillRect(rect, BLUE);
+        };
+
         Game.resetBlendMode();
 
         self.player.render();

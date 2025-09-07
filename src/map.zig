@@ -31,14 +31,14 @@ pub const TileData = struct {
     y: u32,
 };
 
-pub fn Map(comptime width: usize, comptime height: usize) type {
+pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type {
     return struct {
         pub const Self = @This();
+        pub const tile_size: f32 = _tile_size;
 
         alloc: Allocator,
         floor_tiles_sheet: Spritesheet,
         wall_tiles_sheet: Spritesheet,
-        tile_size: f32,
         tiles: Array2D(Tile, width, height),
 
         // TODO: make tile_size comptime
@@ -48,17 +48,15 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
             alloc: Allocator,
             floor_tiles_sheet: Spritesheet,
             wall_tiles_sheet: Spritesheet,
-            tile_size: f32,
             density: f32,
             border_thickness: usize,
-        ) Map(width, height) {
-            var result = Map(width, height){
+        ) Map(width, height, _tile_size) {
+            var result = Map(width, height, _tile_size){
                 .alloc = alloc,
                 .floor_tiles_sheet = floor_tiles_sheet,
                 .wall_tiles_sheet = wall_tiles_sheet,
                 .tiles = Array2D(Tile, width, height).init(Tile{}),
-                .tile_size = tile_size,
-                .collision_shape = .{ .aabb = .init(vector(0, 0), vector(tile_size, tile_size)) },
+                .collision_shape = .{ .aabb = .init(vector(0, 0), vector(_tile_size, _tile_size)) },
             };
 
             var iter = result.tiles.iterator();
@@ -290,10 +288,10 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
 
         pub fn render(self: *Self) void {
             const window: ArrayWindow = .{
-                .x = @as(usize, @intFromFloat(@max(0, @floor(Game.camera.viewport.x / self.tile_size)))),
-                .y = @as(usize, @intFromFloat(@max(0, @floor(Game.camera.viewport.y / self.tile_size)))),
-                .w = @as(usize, @intFromFloat(@ceil(Game.camera.viewport.w / self.tile_size))) + 1,
-                .h = @as(usize, @intFromFloat(@ceil(Game.camera.viewport.h / self.tile_size))) + 1,
+                .x = @as(usize, @intFromFloat(@max(0, @floor(Game.camera.viewport.x / tile_size)))),
+                .y = @as(usize, @intFromFloat(@max(0, @floor(Game.camera.viewport.y / tile_size)))),
+                .w = @as(usize, @intFromFloat(@ceil(Game.camera.viewport.w / tile_size))) + 1,
+                .h = @as(usize, @intFromFloat(@ceil(Game.camera.viewport.h / tile_size))) + 1,
             };
 
             // Render floor tiles
@@ -303,8 +301,8 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
                     if (e.t.floor_image_index >= 0) {
                         const sprite_rect = self.floor_tiles_sheet.sprites[@intCast(e.t.floor_image_index)];
                         Game.renderTexture(self.floor_tiles_sheet.sheet, sprite_rect, .{
-                            .x = calcTileLocation(e.x, self.tile_size),
-                            .y = calcTileLocation(e.y, self.tile_size),
+                            .x = @as(f32, @floatFromInt(e.x)) * tile_size,
+                            .y = @as(f32, @floatFromInt(e.y)) * tile_size,
                             .w = sprite_rect.w,
                             .h = sprite_rect.h,
                         });
@@ -319,16 +317,16 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
                     if (e.t.wall_image_index >= 0) {
                         const sprite_rect = self.wall_tiles_sheet.sprites[@intCast(e.t.wall_image_index)];
                         Game.renderTexture(self.wall_tiles_sheet.sheet, sprite_rect, .{
-                            .x = calcTileLocation(e.x, self.tile_size),
-                            .y = calcTileLocation(e.y, self.tile_size),
+                            .x = @as(f32, @floatFromInt(e.x)) * tile_size,
+                            .y = @as(f32, @floatFromInt(e.y)) * tile_size,
                             .w = sprite_rect.w,
                             .h = sprite_rect.h,
                         });
 
                         Game.setBlendMode(.blend);
                         Game.fillRect(.{
-                            .x = calcTileLocation(e.x, self.tile_size),
-                            .y = calcTileLocation(e.y, self.tile_size),
+                            .x = @as(f32, @floatFromInt(e.x)) * tile_size,
+                            .y = @as(f32, @floatFromInt(e.y)) * tile_size,
                             .w = sprite_rect.w,
                             .h = sprite_rect.h,
                         }, .{ .r = 0, .g = 100, .b = 0, .a = 100 });
@@ -337,17 +335,13 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
             }
         }
 
-        fn calcTileLocation(tile_coord: usize, tile_size: f32) f32 {
-            return @as(f32, @floatFromInt(tile_coord)) * tile_size;
-        }
-
         /// Finds all tiles intersecting with the raycast.
         /// Caller owns the returned data.
         pub fn raycast(self: *Self, start: Vector, end: Vector) []TileData {
             const dx = end.x - start.x;
             const dy = end.y - start.y;
 
-            const steps: usize = @intFromFloat(@max(@abs(dx), @abs(dy)) / self.tile_size + 1);
+            const steps: usize = @intFromFloat(@max(@abs(dx), @abs(dy)) / tile_size + 1);
 
             const x_increment = dx / @as(f32, @floatFromInt(steps));
             const y_increment = dy / @as(f32, @floatFromInt(steps));
@@ -360,8 +354,8 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
 
             // Add + 1 to ensure the last tile is found.
             outer: for (0..steps + 1) |_| {
-                const tile_x: u32 = @intFromFloat(current_x / self.tile_size);
-                const tile_y: u32 = @intFromFloat(current_y / self.tile_size);
+                const tile_x: u32 = @intFromFloat(current_x / tile_size);
+                const tile_y: u32 = @intFromFloat(current_y / tile_size);
                 defer current_x += x_increment;
                 defer current_y += y_increment;
 

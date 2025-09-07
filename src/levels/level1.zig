@@ -14,11 +14,12 @@ const collides = @import("../math/sat.zig").collides;
 const Game = @import("../game.zig");
 const Input = @import("../input.zig");
 const Player = @import("../player.zig").Player;
-const Map = @import("../map.zig").Map;
 const Spritesheet = @import("../spritesheet.zig").Spritesheet;
 const CollisionShape = @import("../math/collisionshape.zig").CollisionShape;
 
 const TileData = @import("../map.zig").TileData;
+
+const Map = @import("../map.zig").Map(144, 144, 16.0);
 
 const GREEN: sdl.pixels.Color = .{ .r = 0, .g = 255, .b = 0, .a = 100 };
 const RED: sdl.pixels.Color = .{ .r = 255, .g = 0, .b = 0, .a = 100 };
@@ -33,7 +34,7 @@ pub const Level1 = struct {
     alloc: Allocator,
 
     player: Player,
-    map: Map(144, 144),
+    map: Map,
 
     // NOTE: Testing code below, can remove later
     raycast_start_loc: ?Vector = null,
@@ -57,7 +58,7 @@ pub const Level1 = struct {
         return .{
             .alloc = alloc,
             .player = player,
-            .map = .init(alloc, floor_sheet, wall_sheet, 16, 47.0, 10),
+            .map = .init(alloc, floor_sheet, wall_sheet, 47.0, 10),
         };
     }
 
@@ -74,11 +75,11 @@ pub const Level1 = struct {
 
         const tile_shape: CollisionShape = self.map.collision_shape;
 
-        const min_x: usize = @intFromFloat(@floor((@min(start_loc.x, self.player.loc.x) - Player.collision_shape.Circle.radius) / self.map.tile_size));
-        const max_x: usize = @intFromFloat(@ceil((@max(start_loc.x, self.player.loc.x) + Player.collision_shape.Circle.radius) / self.map.tile_size));
+        const min_x: usize = @intFromFloat(@floor((@min(start_loc.x, self.player.loc.x) - Player.collision_shape.Circle.radius) / Map.tile_size));
+        const max_x: usize = @intFromFloat(@ceil((@max(start_loc.x, self.player.loc.x) + Player.collision_shape.Circle.radius) / Map.tile_size));
 
-        const min_y: usize = @intFromFloat(@floor((@min(start_loc.y, self.player.loc.y) - Player.collision_shape.Circle.radius) / self.map.tile_size));
-        const max_y: usize = @intFromFloat(@ceil((@max(start_loc.y, self.player.loc.y) + Player.collision_shape.Circle.radius) / self.map.tile_size));
+        const min_y: usize = @intFromFloat(@floor((@min(start_loc.y, self.player.loc.y) - Player.collision_shape.Circle.radius) / Map.tile_size));
+        const max_y: usize = @intFromFloat(@ceil((@max(start_loc.y, self.player.loc.y) + Player.collision_shape.Circle.radius) / Map.tile_size));
 
         var iter = self.map.tiles.window(.{
             .x = min_x,
@@ -91,8 +92,8 @@ pub const Level1 = struct {
             if (!t.t.is_wall) continue;
 
             const tile_loc = vector(
-                @as(f32, @floatFromInt(t.x)) * self.map.tile_size,
-                @as(f32, @floatFromInt(t.y)) * self.map.tile_size,
+                @as(f32, @floatFromInt(t.x)) * Map.tile_size,
+                @as(f32, @floatFromInt(t.y)) * Map.tile_size,
             );
 
             if (collides(
@@ -152,8 +153,8 @@ pub const Level1 = struct {
             const rect: FRect = .{
                 .x = @as(f32, @floatFromInt(t.x)) * 16.0,
                 .y = @as(f32, @floatFromInt(t.y)) * 16.0,
-                .w = self.map.tile_size,
-                .h = self.map.tile_size,
+                .w = Map.tile_size,
+                .h = Map.tile_size,
             };
             Game.fillRect(rect, BLUE);
         };
@@ -171,13 +172,13 @@ pub const Level1 = struct {
         self.player.render();
     }
 
-    fn getHoveredTileBounds(self: *Self) FRect {
+    fn getHoveredTileBounds() FRect {
         const mouse_world_coord: Vector = Game.camera.screenToWorld(Input.mouse.loc);
         return .{
-            .x = @floor(mouse_world_coord.x / self.map.tile_size) * self.map.tile_size,
-            .y = @floor(mouse_world_coord.y / self.map.tile_size) * self.map.tile_size,
-            .w = self.map.tile_size,
-            .h = self.map.tile_size,
+            .x = @floor(mouse_world_coord.x / Map.tile_size) * Map.tile_size,
+            .y = @floor(mouse_world_coord.y / Map.tile_size) * Map.tile_size,
+            .w = Map.tile_size,
+            .h = Map.tile_size,
         };
     }
 };

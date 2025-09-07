@@ -101,9 +101,9 @@ pub const Level1 = struct {
                 Vector.Zero,
             )) |result| {
                 if (result.collision_owner_a) {
-                    self.player.loc = player_loc.add(result.invert().getMinTranslationVector());
+                    self.player.loc = player_loc.add(result.invert().getMinTranslationVector().scale(0.5));
                 } else {
-                    self.player.loc = player_loc.add(result.getMinTranslationVector());
+                    self.player.loc = player_loc.add(result.getMinTranslationVector().scale(0.5));
                 }
             }
         }

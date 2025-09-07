@@ -30,6 +30,8 @@ pub const CollisionResult = struct {
         };
     }
 
+    /// This vector should be multiplied by 0.5 for collisions with static objects,
+    /// or by the ratio of mass between the two objects if they are both dynamic.
     pub fn getMinTranslationVector(self: Self) Vector {
         return self.contact_normal.scale(self.intrusion);
     }

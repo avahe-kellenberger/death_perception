@@ -14,8 +14,12 @@ pub fn Array2D(T: type, comptime width: usize, comptime height: usize) type {
 
         pub fn init(default: T) Self {
             var t: Self = .{};
-            @memset(&t.values, default);
+            t.setAllValues(default);
             return t;
+        }
+
+        pub fn setAllValues(self: *Self, t: T) void {
+            @memset(&self.values, t);
         }
 
         pub fn get(self: *Self, x: usize, y: usize) *T {

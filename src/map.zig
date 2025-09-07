@@ -39,9 +39,8 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
         alloc: Allocator,
         floor_tiles_sheet: Spritesheet,
         wall_tiles_sheet: Spritesheet,
-        tiles: Array2D(Tile, width, height),
+        tiles: *Array2D(Tile, width, height),
 
-        // TODO: make tile_size comptime
         collision_shape: CollisionShape,
 
         pub fn init(
@@ -51,11 +50,14 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             density: f32,
             border_thickness: usize,
         ) Map(width, height, _tile_size) {
+            var tiles = alloc.create(Array2D(Tile, width, height)) catch unreachable;
+            tiles.setAllValues(Tile{});
+
             var result = Map(width, height, _tile_size){
                 .alloc = alloc,
                 .floor_tiles_sheet = floor_tiles_sheet,
                 .wall_tiles_sheet = wall_tiles_sheet,
-                .tiles = Array2D(Tile, width, height).init(Tile{}),
+                .tiles = tiles,
                 .collision_shape = .{ .aabb = .init(vector(0, 0), vector(_tile_size, _tile_size)) },
             };
 

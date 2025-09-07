@@ -96,19 +96,20 @@ pub const Level1 = struct {
                 @as(f32, @floatFromInt(t.y)) * Map.tile_size,
             );
 
+            const player_loc = self.player.loc;
             if (collides(
                 self.alloc,
-                self.player.loc,
+                player_loc,
                 Player.collision_shape,
-                self.player.loc.subtract(start_loc),
+                player_loc.subtract(start_loc),
                 tile_loc,
                 tile_shape,
                 Vector.Zero,
             )) |result| {
                 if (result.collision_owner_a) {
-                    self.player.loc = self.player.loc.add(result.invert().getMinTranslationVector());
+                    self.player.loc = player_loc.add(result.invert().getMinTranslationVector());
                 } else {
-                    self.player.loc = self.player.loc.add(result.getMinTranslationVector());
+                    self.player.loc = player_loc.add(result.getMinTranslationVector());
                 }
             }
         }

@@ -74,8 +74,19 @@ pub const Level1 = struct {
 
         const tile_shape: CollisionShape = self.map.collision_shape;
 
-        // SAT
-        var iter = self.map.tiles.iterator();
+        const min_x: usize = @intFromFloat(@floor((@min(start_loc.x, self.player.loc.x) - Player.collision_shape.Circle.radius) / self.map.tile_size));
+        const max_x: usize = @intFromFloat(@ceil((@max(start_loc.x, self.player.loc.x) + Player.collision_shape.Circle.radius) / self.map.tile_size));
+
+        const min_y: usize = @intFromFloat(@floor((@min(start_loc.y, self.player.loc.y) - Player.collision_shape.Circle.radius) / self.map.tile_size));
+        const max_y: usize = @intFromFloat(@ceil((@max(start_loc.y, self.player.loc.y) + Player.collision_shape.Circle.radius) / self.map.tile_size));
+
+        var iter = self.map.tiles.window(.{
+            .x = min_x,
+            .y = min_y,
+            .w = max_x - min_x + 1,
+            .h = max_y - min_y + 1,
+        });
+
         while (iter.next()) |t| {
             if (!t.t.is_wall) continue;
 
@@ -83,9 +94,6 @@ pub const Level1 = struct {
                 @as(f32, @floatFromInt(t.x)) * self.map.tile_size,
                 @as(f32, @floatFromInt(t.y)) * self.map.tile_size,
             );
-
-            if (@abs(self.player.loc.x - tile_loc.x) > 32.0) continue;
-            if (@abs(self.player.loc.y - tile_loc.y) > 32.0) continue;
 
             if (collides(
                 self.alloc,

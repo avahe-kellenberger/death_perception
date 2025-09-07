@@ -31,8 +31,6 @@ pub var renderer: Renderer = undefined;
 pub var camera: Camera = undefined;
 pub var bg_color: sdl.pixels.Color = .{};
 
-pub var bg_color: sdl.pixels.Color = .{};
-
 var level: Level1 = undefined;
 
 pub fn init(alloc: Allocator, _renderer: Renderer, _camera: Camera) void {
@@ -51,9 +49,9 @@ pub fn deinit() void {
 }
 
 pub fn update(frame_delay: f32) void {
-    if (Input.isPressed(.m)) {
+    if (Input.isKeyPressed(.m)) {
         state = .main_menu;
-    } else if (Input.isPressed(.g)) {
+    } else if (Input.isKeyPressed(.g)) {
         state = .in_game;
     }
     switch (state) {

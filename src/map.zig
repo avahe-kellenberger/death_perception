@@ -4,7 +4,7 @@ const Allocator = std.mem.Allocator;
 const sdl = @import("sdl3");
 const Renderer = sdl.render.Renderer;
 const FRect = sdl.rect.FRect;
-const FPoint = sdl.rect.FPoint;
+const IPoint = sdl.rect.IPoint;
 
 const Game = @import("game.zig");
 const rand = @import("random.zig").rand;
@@ -12,37 +12,53 @@ const Array2D = @import("array_2d.zig").Array2D;
 const ArrayWindow = @import("array_2d.zig").ArrayWindow;
 const Spritesheet = @import("spritesheet.zig").Spritesheet;
 
-const Tile = struct {
+const vector_mod = @import("math/vector.zig");
+const Vector = vector_mod.Vector(f32);
+const vector = vector_mod.vector;
+
+const CollisionShape = @import("math/collisionshape.zig").CollisionShape;
+
+pub const Tile = struct {
     floor_image_index: isize = -1,
     wall_image_index: isize = -1,
     neighbor_bit_sum: u8 = 0,
     is_wall: bool = false,
 };
 
-pub fn Map(comptime width: usize, comptime height: usize) type {
+pub const TileData = struct {
+    tile: *Tile,
+    x: u32,
+    y: u32,
+};
+
+pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type {
     return struct {
         pub const Self = @This();
+        pub const tile_size: f32 = _tile_size;
 
         alloc: Allocator,
         floor_tiles_sheet: Spritesheet,
         wall_tiles_sheet: Spritesheet,
-        tile_size: f32,
-        tiles: Array2D(Tile, width, height),
+        tiles: *Array2D(Tile, width, height),
+
+        collision_shape: CollisionShape,
 
         pub fn init(
             alloc: Allocator,
             floor_tiles_sheet: Spritesheet,
             wall_tiles_sheet: Spritesheet,
-            tile_size: f32,
             density: f32,
             border_thickness: usize,
-        ) Map(width, height) {
-            var result = Map(width, height){
+        ) Map(width, height, _tile_size) {
+            var tiles = alloc.create(Array2D(Tile, width, height)) catch unreachable;
+            tiles.setAllValues(Tile{});
+
+            var result = Map(width, height, _tile_size){
                 .alloc = alloc,
                 .floor_tiles_sheet = floor_tiles_sheet,
                 .wall_tiles_sheet = wall_tiles_sheet,
-                .tiles = Array2D(Tile, width, height).init(Tile{}),
-                .tile_size = tile_size,
+                .tiles = tiles,
+                .collision_shape = .{ .aabb = .init(vector(0, 0), vector(_tile_size, _tile_size)) },
             };
 
             var iter = result.tiles.iterator();
@@ -223,7 +239,8 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
                         22, 150, 214, 246 => 3,
                         254 => 4,
                         208, 212, 240, 244 => 5,
-                        else => 0,
+                        // This is usually image index 0, but we don't need to draw the empty tile.
+                        else => -1,
                     };
                 }
             }
@@ -273,10 +290,10 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
 
         pub fn render(self: *Self) void {
             const window: ArrayWindow = .{
-                .x = @as(usize, @intFromFloat(@max(0, @floor(Game.camera.viewport.x / self.tile_size)))),
-                .y = @as(usize, @intFromFloat(@max(0, @floor(Game.camera.viewport.y / self.tile_size)))),
-                .w = @as(usize, @intFromFloat(@ceil(Game.camera.viewport.w / self.tile_size))) + 1,
-                .h = @as(usize, @intFromFloat(@ceil(Game.camera.viewport.h / self.tile_size))) + 1,
+                .x = @as(usize, @intFromFloat(@max(0, @floor(Game.camera.viewport.x / tile_size)))),
+                .y = @as(usize, @intFromFloat(@max(0, @floor(Game.camera.viewport.y / tile_size)))),
+                .w = @as(usize, @intFromFloat(@ceil(Game.camera.viewport.w / tile_size))) + 1,
+                .h = @as(usize, @intFromFloat(@ceil(Game.camera.viewport.h / tile_size))) + 1,
             };
 
             // Render floor tiles
@@ -286,8 +303,8 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
                     if (e.t.floor_image_index >= 0) {
                         const sprite_rect = self.floor_tiles_sheet.sprites[@intCast(e.t.floor_image_index)];
                         Game.renderTexture(self.floor_tiles_sheet.sheet, sprite_rect, .{
-                            .x = calcTileLocation(e.x, self.tile_size),
-                            .y = calcTileLocation(e.y, self.tile_size),
+                            .x = @as(f32, @floatFromInt(e.x)) * tile_size,
+                            .y = @as(f32, @floatFromInt(e.y)) * tile_size,
                             .w = sprite_rect.w,
                             .h = sprite_rect.h,
                         });
@@ -302,19 +319,100 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
                     if (e.t.wall_image_index >= 0) {
                         const sprite_rect = self.wall_tiles_sheet.sprites[@intCast(e.t.wall_image_index)];
                         Game.renderTexture(self.wall_tiles_sheet.sheet, sprite_rect, .{
-                            .x = calcTileLocation(e.x, self.tile_size),
-                            .y = calcTileLocation(e.y, self.tile_size),
+                            .x = @as(f32, @floatFromInt(e.x)) * tile_size,
+                            .y = @as(f32, @floatFromInt(e.y)) * tile_size,
                             .w = sprite_rect.w,
                             .h = sprite_rect.h,
                         });
+
+                        Game.setBlendMode(.blend);
+                        Game.fillRect(.{
+                            .x = @as(f32, @floatFromInt(e.x)) * tile_size,
+                            .y = @as(f32, @floatFromInt(e.y)) * tile_size,
+                            .w = sprite_rect.w,
+                            .h = sprite_rect.h,
+                        }, .{ .r = 0, .g = 100, .b = 0, .a = 100 });
                     }
                 }
             }
         }
 
-        fn calcTileLocation(tile_coord: usize, tile_size: f32) f32 {
-            const tile_coord_float: f32 = @floatFromInt(tile_coord);
-            return @floor(tile_coord_float * tile_size);
+        /// Finds all tiles intersecting with the raycast.
+        /// Caller owns the returned data.
+        pub fn raycast(self: *Self, start: Vector, end: Vector) []TileData {
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+
+            const steps: usize = @intFromFloat(@max(@abs(dx), @abs(dy)) / tile_size + 1);
+
+            const x_increment = dx / @as(f32, @floatFromInt(steps));
+            const y_increment = dy / @as(f32, @floatFromInt(steps));
+
+            var current_x = start.x;
+            var current_y = start.y;
+
+            var tiles_hit: std.ArrayList(TileData) = .empty;
+            defer tiles_hit.deinit(self.alloc);
+
+            // Add + 1 to ensure the last tile is found.
+            outer: for (0..steps + 1) |_| {
+                const tile_x: u32 = @intFromFloat(current_x / tile_size);
+                const tile_y: u32 = @intFromFloat(current_y / tile_size);
+                defer current_x += x_increment;
+                defer current_y += y_increment;
+
+                if (tile_x < 0 or tile_x >= width or tile_y < 0 or tile_y >= height) {
+                    // Out of bounds
+                    break;
+                }
+
+                const tile = self.tiles.get(tile_x, tile_y);
+                if (tile.is_wall) {
+                    for (tiles_hit.items) |hit| {
+                        // Make sure we don't add duplicate tiles.
+                        if (hit.x == tile_x and hit.y == tile_y) continue :outer;
+                    }
+
+                    tiles_hit.append(self.alloc, .{
+                        .tile = tile,
+                        .x = tile_x,
+                        .y = tile_y,
+                    }) catch unreachable;
+                }
+            }
+            return tiles_hit.toOwnedSlice(self.alloc) catch unreachable;
+        }
+
+        pub fn getPotentialArea(shape: *const CollisionShape, start_loc: Vector, movement: Vector) ArrayWindow {
+            switch (shape.*) {
+                .aabb => |aabb| {
+                    // Middle of the aabb is its location, need half size from its center.
+                    const size = aabb.bottom_right.subtract(aabb.top_left).scale(0.5);
+                    const min_x = aabb.top_left.x + @min(start_loc.x, start_loc.x + movement.x) - size.x;
+                    const min_y = aabb.bottom_right.y + @min(start_loc.y, start_loc.y + movement.y) - size.y;
+                    return ArrayWindow{
+                        .x = @intFromFloat(@floor(min_x / tile_size)),
+                        .y = @intFromFloat(@floor(min_y / tile_size)),
+                        .w = @as(usize, @intFromFloat(@ceil(size.x / tile_size))) + 1,
+                        .h = @as(usize, @intFromFloat(@ceil(size.y / tile_size))) + 1,
+                    };
+                },
+                .circle => |circle| {
+                    const dest = start_loc.add(movement);
+                    const min_x = circle.center.x + @min(start_loc.x, dest.x) - circle.radius;
+                    const max_x = circle.center.x + @max(start_loc.x, dest.x) + circle.radius;
+                    const min_y = circle.center.y + @min(start_loc.y, dest.y) - circle.radius;
+                    const max_y = circle.center.y + @max(start_loc.y, dest.y) + circle.radius;
+                    const w = max_x - min_x;
+                    const h = max_y - min_y;
+                    return ArrayWindow{
+                        .x = @intFromFloat(@floor(min_x / tile_size)),
+                        .y = @intFromFloat(@floor(min_y / tile_size)),
+                        .w = @as(usize, @intFromFloat(@ceil(w / tile_size))) + 1,
+                        .h = @as(usize, @intFromFloat(@ceil(h / tile_size))) + 1,
+                    };
+                },
+            }
         }
     };
 }

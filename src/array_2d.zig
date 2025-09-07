@@ -14,8 +14,12 @@ pub fn Array2D(T: type, comptime width: usize, comptime height: usize) type {
 
         pub fn init(default: T) Self {
             var t: Self = .{};
-            @memset(&t.values, default);
+            t.setAllValues(default);
             return t;
+        }
+
+        pub fn setAllValues(self: *Self, t: T) void {
+            @memset(&self.values, t);
         }
 
         pub fn get(self: *Self, x: usize, y: usize) *T {
@@ -31,8 +35,8 @@ pub fn Array2D(T: type, comptime width: usize, comptime height: usize) type {
             return width * y + x;
         }
 
-        pub fn iterator(self: *Self) Iterator(T, width, height) {
-            return Iterator(T, width, height).init(self, .{
+        pub fn iterator(self: *Self) Iterator {
+            return Iterator.init(self, .{
                 .x = 0,
                 .y = 0,
                 .w = width,
@@ -43,12 +47,12 @@ pub fn Array2D(T: type, comptime width: usize, comptime height: usize) type {
         pub fn window(
             self: *Self,
             win: ArrayWindow,
-        ) Iterator(T, width, height) {
+        ) Iterator {
             const x = @min(win.x, width);
             const y = @min(win.y, height);
             const w = @min(win.w, width - x);
             const h = if (w != 0) @min(win.h, height - y) else 0;
-            return Iterator(T, width, height).init(
+            return Iterator.init(
                 self,
                 .{
                     .x = x,
@@ -58,54 +62,48 @@ pub fn Array2D(T: type, comptime width: usize, comptime height: usize) type {
                 },
             );
         }
-    };
-}
 
-fn Iterator(comptime T: type, comptime width: usize, comptime height: usize) type {
-    const Result = struct { t: *T, x: usize, y: usize };
+        const Iterator = struct {
+            const Result = struct { t: *T, x: usize, y: usize };
 
-    return struct {
-        pub const Self = @This();
+            arr: *Array2D(T, width, height),
 
-        arr: *Array2D(T, width, height),
+            // Window
+            win_x: usize, // inclusive
+            win_max_x: usize, // exclusive
+            win_max_y: usize, // exclusive
 
-        // Window
-        win_x: usize, // inclusive
-        win_max_x: usize, // exclusive
-        win_max_y: usize, // exclusive
+            // State
+            x: usize,
+            y: usize,
 
-        // State
-        x: usize,
-        y: usize,
-
-        pub fn init(arr: *Array2D(T, width, height), window: ArrayWindow) Iterator(T, width, height) {
-            return .{
-                .arr = arr,
-                .win_x = window.x,
-                .win_max_x = window.x + window.w,
-                .win_max_y = window.y + window.h,
-                .x = window.x,
-                .y = window.y,
-            };
-        }
-
-        pub fn next(self: *Self) ?Result {
-            defer self.x += 1;
-
-            if (self.x >= self.win_max_x) {
-                self.x = self.win_x;
-                self.y += 1;
-            }
-            if (self.y >= self.win_max_y) {
-                return null;
+            pub fn init(arr: *Array2D(T, width, height), win: ArrayWindow) Iterator {
+                return .{
+                    .arr = arr,
+                    .win_x = win.x,
+                    .win_max_x = win.x + win.w,
+                    .win_max_y = win.y + win.h,
+                    .x = win.x,
+                    .y = win.y,
+                };
             }
 
-            return .{
-                .t = self.arr.get(self.x, self.y),
-                .x = self.x,
-                .y = self.y,
-            };
-        }
+            pub fn next(self: *Iterator) ?Result {
+                defer self.x += 1;
+
+                if (self.x >= self.win_max_x) {
+                    self.x = self.win_x;
+                    self.y += 1;
+                }
+                if (self.y >= self.win_max_y) return null;
+
+                return .{
+                    .t = self.arr.get(self.x, self.y),
+                    .x = self.x,
+                    .y = self.y,
+                };
+            }
+        };
     };
 }
 

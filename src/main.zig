@@ -5,6 +5,7 @@ const Game = @import("game.zig");
 const Camera = @import("camera.zig").Camera;
 
 const Input = @import("input.zig");
+
 const random_mod = @import("random.zig");
 
 const screen_width = 1600;
@@ -70,15 +71,18 @@ pub fn main() !void {
     defer Game.deinit();
 
     var running = true;
+
     while (running) {
         // Delay to limit the FPS
         const dt = fps_capper.delay();
-        std.log.err("{}", .{dt});
-        std.log.err("Real FPS: {}", .{fps_capper.getObservedFps()});
+        // std.log.err("{}", .{dt});
+        // std.log.err("Real FPS: {}", .{fps_capper.getObservedFps()});
 
+        Input.resetFrameSpecificState();
         while (sdl.events.poll()) |event| {
             switch (event) {
-                .key_up, .key_down => |e| try Input.update(e),
+                .key_up, .key_down => try Input.update(event),
+                .mouse_motion, .mouse_button_up, .mouse_button_down => try Input.update(event),
                 .quit, .terminating => running = false,
                 .window_pixel_size_changed => |e| {
                     Game.camera.setSize(@floatFromInt(e.width), @floatFromInt(e.height));
@@ -90,7 +94,7 @@ pub fn main() !void {
             }
         }
 
-        if (!running or Input.isPressed(.escape)) break;
+        if (!running or Input.isKeyPressed(.escape)) break;
 
         Game.update(dt);
         Game.render();

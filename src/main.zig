@@ -92,7 +92,6 @@ pub fn main() !void {
 
         if (!running or Input.isPressed(.escape)) break;
 
-        try renderer.clear();
         Game.update(dt);
         Game.render();
 

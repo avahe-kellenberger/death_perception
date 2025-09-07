@@ -4,14 +4,19 @@ const Allocator = std.mem.Allocator;
 const sdl = @import("sdl3");
 const Renderer = sdl.render.Renderer;
 const Texture = sdl.render.Texture;
-const FPoint = sdl.rect.FPoint;
+const vector_mod = @import("../math/vector.zig");
+const Vector = vector_mod.Vector(f32);
+const vector = vector_mod.vector;
 const FRect = sdl.rect.FRect;
+
+const collides = @import("../math/sat.zig").collides;
 
 const Game = @import("../game.zig");
 const Input = @import("../input.zig");
 const Player = @import("../player.zig").Player;
 const Map = @import("../map.zig").Map;
 const Spritesheet = @import("../spritesheet.zig").Spritesheet;
+const CollisionShape = @import("../math/collisionshape.zig").CollisionShape;
 
 const TileData = @import("../map.zig").TileData;
 
@@ -31,8 +36,8 @@ pub const Level1 = struct {
     map: Map(144, 144),
 
     // NOTE: Testing code below, can remove later
-    raycast_start_loc: ?FPoint = null,
-    raycast_end_loc: ?FPoint = null,
+    raycast_start_loc: ?Vector = null,
+    raycast_end_loc: ?Vector = null,
     raycast_tiles: ?[]TileData = null,
 
     pub fn init(alloc: Allocator) Level1 {
@@ -64,7 +69,41 @@ pub const Level1 = struct {
     }
 
     pub fn update(self: *Self, dt: f32) void {
+        const start_loc = self.player.loc;
         self.player.update(dt);
+
+        const tile_shape: CollisionShape = self.map.collision_shape;
+
+        // SAT
+        var iter = self.map.tiles.iterator();
+        while (iter.next()) |t| {
+            if (!t.t.is_wall) continue;
+
+            const tile_loc = vector(
+                @as(f32, @floatFromInt(t.x)) * self.map.tile_size,
+                @as(f32, @floatFromInt(t.y)) * self.map.tile_size,
+            );
+
+            if (@abs(self.player.loc.x - tile_loc.x) > 32.0) continue;
+            if (@abs(self.player.loc.y - tile_loc.y) > 32.0) continue;
+
+            if (collides(
+                self.alloc,
+                self.player.loc,
+                Player.collision_shape,
+                self.player.loc.subtract(start_loc),
+                tile_loc,
+                tile_shape,
+                Vector.Zero,
+            )) |result| {
+                if (result.collision_owner_a) {
+                    self.player.loc = self.player.loc.add(result.invert().getMinTranslationVector());
+                } else {
+                    self.player.loc = self.player.loc.add(result.getMinTranslationVector());
+                }
+            }
+        }
+
         Game.camera.centerOnPoint(self.player.loc);
     }
 
@@ -92,8 +131,6 @@ pub const Level1 = struct {
 
         // NOTE: Allows for transparency (should this just be our default?)
         Game.setBlendMode(.blend);
-        // if (self.start_tile) |t| Game.fillRect(t, GREEN);
-        // if (self.end_tile) |t| Game.fillRect(t, RED);
 
         if (self.raycast_start_loc) |start| {
             Game.fillRect(.{ .x = start.x - 1, .y = start.y - 1, .w = 2, .h = 2 }, GREEN);
@@ -113,13 +150,21 @@ pub const Level1 = struct {
             Game.fillRect(rect, BLUE);
         };
 
+        if (self.raycast_start_loc) |start| if (self.raycast_end_loc) |end| {
+            Game.renderer.setDrawColor(RED) catch unreachable;
+            Game.renderer.renderLine(
+                .{ .x = start.x - Game.camera.viewport.x, .y = start.y - Game.camera.viewport.y },
+                .{ .x = end.x - Game.camera.viewport.x, .y = end.y - Game.camera.viewport.y },
+            ) catch unreachable;
+        };
+
         Game.resetBlendMode();
 
         self.player.render();
     }
 
     fn getHoveredTileBounds(self: *Self) FRect {
-        const mouse_world_coord: FPoint = Game.camera.screenToWorld(Input.mouse.loc);
+        const mouse_world_coord: Vector = Game.camera.screenToWorld(Input.mouse.loc);
         return .{
             .x = @floor(mouse_world_coord.x / self.map.tile_size) * self.map.tile_size,
             .y = @floor(mouse_world_coord.y / self.map.tile_size) * self.map.tile_size,

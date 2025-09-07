@@ -2,7 +2,7 @@ const std = @import("std");
 
 const sdl = @import("sdl3");
 const FRect = sdl.rect.FRect;
-const FPoint = sdl.rect.FPoint;
+const Vector = @import("math/vector.zig").Vector(f32);
 
 const Size = @import("size.zig").Size;
 
@@ -12,7 +12,7 @@ pub const Camera = struct {
     pub const Self = @This();
 
     /// Center of camera (in game coordinates)
-    _loc: FPoint,
+    _loc: Vector,
 
     // Camera size (in screen coordinates)
     _size: Size(f32),
@@ -23,7 +23,7 @@ pub const Camera = struct {
     /// Outer bounds of camera (in game coordinates)
     viewport: FRect = .{ .x = 0, .y = 0, .w = 0, .h = 0 },
 
-    pub fn init(loc: FPoint, size: Size(f32)) Camera {
+    pub fn init(loc: Vector, size: Size(f32)) Camera {
         var cam: Camera = .{
             ._loc = loc,
             ._size = size,
@@ -38,7 +38,7 @@ pub const Camera = struct {
         return 1.0 / relative_z;
     }
 
-    pub fn centerOnPoint(self: *Self, p: FPoint) void {
+    pub fn centerOnPoint(self: *Self, p: Vector) void {
         self._loc = p;
         self.updateViewport();
     }
@@ -67,7 +67,7 @@ pub const Camera = struct {
         return self.viewport.hasIntersection(rect);
     }
 
-    pub fn screenToWorld(self: *Self, p: FPoint) FPoint {
+    pub fn screenToWorld(self: *Self, p: Vector) Vector {
         const relative_z = DEFAULT_Z - self._z;
         return .{
             .x = (p.x * relative_z) + self._loc.x - self.viewport.w * 0.5,

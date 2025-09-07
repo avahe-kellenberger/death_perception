@@ -31,7 +31,7 @@ pub const CollisionResult = struct {
     }
 
     pub fn getMinTranslationVector(self: Self) Vector {
-        return self.contact_normal.multiply(-self.intrusion);
+        return self.contact_normal.scale(self.intrusion);
     }
 
     pub fn invert(self: Self) Self {
@@ -111,7 +111,7 @@ pub fn collides(
     var intrusion_contact: f32 = 0;
     var contact_normal: ?Vector = null;
     var min_exit_time_ratio: f32 = std.math.inf(f32);
-    var max_enter_time_ratio: f32 = std.math.inf(f32);
+    var max_enter_time_ratio: f32 = -std.math.inf(f32);
 
     for (axes.items, 0..) |axis, i| {
         const is_a = i < num_axes_a;
@@ -129,7 +129,7 @@ pub fn collides(
         // Calculate contact time ratio
         var enter_time_ratio: f32 = 0.0;
         var exit_time_ratio: f32 = 0.0;
-        if (proj_a.x > proj_b.x) { // A is to the right of B
+        if (proj_a.x > proj_b.y) { // A is to the right of B
             if (move_vector_proj >= 0) return null;
             enter_time_ratio = (proj_b.y - proj_a.x) / move_vector_proj;
             exit_time_ratio = (proj_b.x - proj_a.y) / move_vector_proj;
@@ -147,7 +147,7 @@ pub fn collides(
             } else if (move_vector_proj < 0) {
                 enter_time_ratio = (proj_b.y - proj_a.x) / move_vector_proj;
                 exit_time_ratio = (proj_b.x - proj_a.y) / move_vector_proj;
-                total_proj_max_a += move_vector_proj;
+                total_proj_min_a += move_vector_proj;
             } else {
                 enter_time_ratio = -std.math.inf(f32);
                 exit_time_ratio = std.math.inf(f32);
@@ -201,14 +201,22 @@ pub fn collides(
                 return .init(
                     is_shape_a_contact,
                     intrusion_contact,
-                    contact_normal,
+                    normal,
                     max_enter_time_ratio,
                     contact_loc,
                 );
             }
         } else if (mtv_normal) |normal| {
             // Static collision
-            const contact_loc = getContactLoc(&axes, loc_a, shape_a, loc_b, shape_b, mtv_normal, is_shape_a_contact);
+            const contact_loc = getContactLoc(
+                &axes,
+                loc_a,
+                shape_a,
+                loc_b,
+                shape_b,
+                normal,
+                is_shape_a_contact,
+            );
             return .init(is_shape_a_mtv, intrusion_mtv, normal, null, contact_loc);
         }
     }
@@ -261,7 +269,10 @@ fn _getContactLoc(
     other_contact_normal: Vector,
 ) Vector {
     buffer.clearRetainingCapacity();
-    const other_farthest_points = translateVerticies(other_shape.getFarthest(other_contact_normal, &buffer), other_loc);
+    const other_farthest_points = translateVerticies(
+        other_shape.getFarthest(other_contact_normal, buffer),
+        other_loc,
+    );
     if (other_farthest_points.len == 1) {
         return other_farthest_points[0];
     }
@@ -273,7 +284,10 @@ fn _getContactLoc(
     const min_max_proj_other = MinMaxProjectionInterval.init(buffer.items, edge);
 
     buffer.clearRetainingCapacity();
-    const owner_farthest_points = translateVerticies(owner_shape.getFarthest(owner_contact_normal, &buffer), owner_loc);
+    const owner_farthest_points = translateVerticies(
+        owner_shape.getFarthest(owner_contact_normal, buffer),
+        owner_loc,
+    );
     if (owner_farthest_points.len == 1) {
         return owner_farthest_points[0];
     }
@@ -295,7 +309,7 @@ fn _getContactLoc(
 }
 
 fn translateVerticies(verts: []Vector, delta: Vector) []Vector {
-    for (verts) |*v| v = v.add(delta);
+    for (verts) |*v| v.* = v.add(delta);
     return verts;
 }
 
@@ -310,10 +324,10 @@ const MinMaxProjectionInterval = struct {
     pub fn init(verts: []Vector, axis: Vector) Self {
         std.debug.assert(verts.len > 0);
 
-        var min: ?Vector = null;
-        var min_point = std.math.inf(f32);
-        var max: ?Vector = null;
-        var max_point = -std.math.inf(f32);
+        var min: f32 = std.math.inf(f32);
+        var min_point: ?Vector = null;
+        var max: f32 = -std.math.inf(f32);
+        var max_point: ?Vector = null;
 
         for (verts) |v| {
             const value = v.dotProduct(axis);
@@ -327,7 +341,7 @@ const MinMaxProjectionInterval = struct {
             }
         }
         std.debug.assert(min_point != null and max_point != null);
-        return .{ .min = min, .min_point = min_point, .max = max, .max_point = max_point };
+        return .{ .min = min, .min_point = min_point.?, .max = max, .max_point = max_point.? };
     }
 
     pub fn middle(self: Self, other: Self) Self {

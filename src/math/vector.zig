@@ -50,6 +50,14 @@ pub fn Vector(T: type) type {
             return .{ .x = self.x * scalar, .y = self.y * scalar };
         }
 
+        pub fn maxMagnitude(self: Self, magnitude: f32) Self {
+            const mag = self.getMagnitude();
+            if (mag <= magnitude) {
+                return self;
+            }
+            return self.scale(magnitude / mag);
+        }
+
         pub fn distanceSquared(self: Self, other: Self) f32 {
             const result = pow(T, self.x - other.x, 2) + pow(T, self.y - other.y, 2);
             switch (@typeInfo(T)) {

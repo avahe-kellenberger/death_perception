@@ -4,7 +4,6 @@ const Allocator = std.mem.Allocator;
 const sdl = @import("sdl3");
 const Renderer = sdl.render.Renderer;
 const FRect = sdl.rect.FRect;
-const FPoint = sdl.rect.FPoint;
 const IPoint = sdl.rect.IPoint;
 
 const Game = @import("game.zig");
@@ -12,6 +11,12 @@ const rand = @import("random.zig").rand;
 const Array2D = @import("array_2d.zig").Array2D;
 const ArrayWindow = @import("array_2d.zig").ArrayWindow;
 const Spritesheet = @import("spritesheet.zig").Spritesheet;
+
+const vector_mod = @import("math/vector.zig");
+const Vector = vector_mod.Vector(f32);
+const vector = vector_mod.vector;
+
+const CollisionShape = @import("math/collisionshape.zig").CollisionShape;
 
 pub const Tile = struct {
     floor_image_index: isize = -1,
@@ -36,6 +41,9 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
         tile_size: f32,
         tiles: Array2D(Tile, width, height),
 
+        // TODO: make tile_size comptime
+        collision_shape: CollisionShape,
+
         pub fn init(
             alloc: Allocator,
             floor_tiles_sheet: Spritesheet,
@@ -50,6 +58,7 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
                 .wall_tiles_sheet = wall_tiles_sheet,
                 .tiles = Array2D(Tile, width, height).init(Tile{}),
                 .tile_size = tile_size,
+                .collision_shape = .{ .aabb = .init(vector(0, 0), vector(tile_size, tile_size)) },
             };
 
             var iter = result.tiles.iterator();
@@ -315,6 +324,14 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
                             .w = sprite_rect.w,
                             .h = sprite_rect.h,
                         });
+
+                        Game.setBlendMode(.blend);
+                        Game.fillRect(.{
+                            .x = calcTileLocation(e.x, self.tile_size),
+                            .y = calcTileLocation(e.y, self.tile_size),
+                            .w = sprite_rect.w,
+                            .h = sprite_rect.h,
+                        }, .{ .r = 0, .g = 100, .b = 0, .a = 100 });
                     }
                 }
             }
@@ -326,7 +343,7 @@ pub fn Map(comptime width: usize, comptime height: usize) type {
 
         /// Finds all tiles intersecting with the raycast.
         /// Caller owns the returned data.
-        pub fn raycast(self: *Self, start: FPoint, end: FPoint) []TileData {
+        pub fn raycast(self: *Self, start: Vector, end: Vector) []TileData {
             const dx = end.x - start.x;
             const dy = end.y - start.y;
 

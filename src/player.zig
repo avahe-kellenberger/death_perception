@@ -9,14 +9,17 @@ const FPoint = sdl.rect.FPoint;
 const Game = @import("game.zig");
 const Input = @import("input.zig");
 const Vector = @import("math/vector.zig").Vector(f32);
+const CollisionShape = @import("math/collisionshape.zig").CollisionShape;
 
 const max_speed = 65.0;
 
 pub const Player = struct {
     pub const Self = @This();
 
+    pub const collision_shape: CollisionShape = .{ .Circle = .init(Vector.Zero, 8.0) };
+
     image: Texture,
-    loc: FPoint = .{ .x = 0, .y = 0 },
+    loc: Vector = .init(0, 0),
     image_size: FPoint = undefined,
 
     pub fn init() Player {
@@ -42,7 +45,7 @@ pub const Player = struct {
         if (Input.isKeyPressed(.up)) vel.y -= max_speed;
         if (Input.isKeyPressed(.down)) vel.y += max_speed;
 
-        vel = vel.normalize().scale(max_speed);
+        vel = vel.maxMagnitude(max_speed);
 
         self.loc.x += vel.x * dt;
         self.loc.y += vel.y * dt;
@@ -55,5 +58,13 @@ pub const Player = struct {
             .w = self.image_size.x,
             .h = self.image_size.y,
         });
+
+        Game.setBlendMode(.blend);
+        Game.fillRect(.{
+            .x = self.loc.x - self.image_size.x * 0.5,
+            .y = self.loc.y - self.image_size.y * 0.5,
+            .w = self.image_size.x,
+            .h = self.image_size.y,
+        }, .{ .r = 255, .g = 0, .b = 0, .a = 100 });
     }
 };

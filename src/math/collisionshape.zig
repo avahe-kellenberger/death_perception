@@ -22,7 +22,7 @@ pub const CollisionShape = union(enum) {
     aabb: AABB,
     Circle: Circle,
 
-    pub fn getProjectionAxesCount(self: *Self, other: *CollisionShape) u32 {
+    pub fn getProjectionAxesCount(self: Self, other: Self) u32 {
         switch (self) {
             .aabb => return 2,
             .Circle => switch (other) {
@@ -38,9 +38,9 @@ pub const CollisionShape = union(enum) {
     /// otherShape is the collision shape being tested against.
     /// toOther isa a vector from this shape's reference frame to the other shape's reference frame.
     pub fn getProjectionAxes(
-        self: *Self,
+        self: Self,
         verticies: *ArrayList(Vector),
-        other: *CollisionShape,
+        other: CollisionShape,
         to_other: Vector,
     ) void {
         switch (self) {
@@ -49,7 +49,7 @@ pub const CollisionShape = union(enum) {
             },
             .Circle => |circle| switch (other) {
                 .aabb => |aabb| {
-                    circleToAABBProjectionAxes(&verticies, circle, aabb, to_other);
+                    circleToAABBProjectionAxes(verticies, circle, aabb, to_other);
                 },
                 .Circle => |other_circle| {
                     verticies.appendAssumeCapacity(other_circle.center.subtract(circle.center).add(to_other).normalize());
@@ -61,25 +61,23 @@ pub const CollisionShape = union(enum) {
     pub fn project(self: Self, loc: Vector, axis: Vector) Vector {
         switch (self) {
             .aabb => |aabb| {
-                var projection = Vector.init(0, 0);
-                var dot_product: f32 = 0.0;
-
+                var projection = Vector.init(std.math.inf(f32), -std.math.inf(f32));
                 for (aabb.verticies()) |v| {
-                    dot_product = axis.dotProduct(v.add(loc));
+                    const dot_product = axis.dotProduct(v.add(loc));
                     if (dot_product < projection.x) projection.x = dot_product;
                     if (dot_product > projection.y) projection.y = dot_product;
                 }
                 return projection;
             },
             .Circle => |circle| {
-                const center_dot = axis.dotProduct(circle.center + loc);
+                const center_dot = axis.dotProduct(circle.center.add(loc));
                 return .init(center_dot - circle.radius, center_dot + circle.radius);
             },
         }
     }
 
     /// Assumes the ArrayList has enough capacity.
-    pub fn getFarthest(self: Self, direction: Vector, out: *ArrayList(Vector)) void {
+    pub fn getFarthest(self: Self, direction: Vector, out: *ArrayList(Vector)) []Vector {
         switch (self) {
             .aabb => |aabb| {
                 if (direction.x == 0) {
@@ -90,7 +88,7 @@ pub const CollisionShape = union(enum) {
                     } else if (direction.y < 0) {
                         // Return top 2 verts
                         out.appendAssumeCapacity(aabb.top_left);
-                        out.appendAssumeCapacity(point(self.bottom_right.x, self.top_left.y));
+                        out.appendAssumeCapacity(point(aabb.bottom_right.x, aabb.top_left.y));
                     }
                 } else if (direction.x > 0) {
                     if (direction.y == 0) {
@@ -119,9 +117,10 @@ pub const CollisionShape = union(enum) {
                 }
             },
             .Circle => |circle| {
-                out.appendAssumeCapacity(direction.scale(circle.radius));
+                out.appendAssumeCapacity(circle.center.add(direction.scale(circle.radius)));
             },
         }
+        return out.items;
     }
 };
 
@@ -135,7 +134,7 @@ pub const AABB = struct {
         return AABB{ .top_left = top_left, .bottom_right = bottom_right };
     }
 
-    pub fn verticies(self: *Self) [4]Vector {
+    pub fn verticies(self: *const Self) [4]Vector {
         return .{
             self.top_left,
             point(self.bottom_right.x, self.top_left.y),

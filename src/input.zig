@@ -3,7 +3,7 @@ const Allocator = std.mem.Allocator;
 
 const sdl = @import("sdl3");
 const Keycode = sdl.keycode.Keycode;
-const FPoint = sdl.rect.FPoint;
+const Vector = @import("math/vector.zig").Vector(f32);
 const Button = sdl.mouse.Button;
 
 pub const InputState = enum {
@@ -18,7 +18,7 @@ const Mouse = struct {
 
     alloc: Allocator,
 
-    loc: FPoint,
+    loc: Vector,
     buttons: std.AutoHashMap(Button, InputState),
 
     pub fn init(a: Allocator) Self {

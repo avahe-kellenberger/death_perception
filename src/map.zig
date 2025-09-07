@@ -382,5 +382,37 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             }
             return tiles_hit.toOwnedSlice(self.alloc) catch unreachable;
         }
+
+        pub fn getPotentialArea(shape: *const CollisionShape, start_loc: Vector, movement: Vector) ArrayWindow {
+            switch (shape.*) {
+                .aabb => |aabb| {
+                    // Middle of the aabb is its location, need half size from its center.
+                    const size = aabb.bottom_right.subtract(aabb.top_left).scale(0.5);
+                    const min_x = aabb.top_left.x + @min(start_loc.x, start_loc.x + movement.x) - size.x;
+                    const min_y = aabb.bottom_right.y + @min(start_loc.y, start_loc.y + movement.y) - size.y;
+                    return ArrayWindow{
+                        .x = @intFromFloat(@floor(min_x / tile_size)),
+                        .y = @intFromFloat(@floor(min_y / tile_size)),
+                        .w = @as(usize, @intFromFloat(@ceil(size.x / tile_size))) + 1,
+                        .h = @as(usize, @intFromFloat(@ceil(size.y / tile_size))) + 1,
+                    };
+                },
+                .circle => |circle| {
+                    const dest = start_loc.add(movement);
+                    const min_x = circle.center.x + @min(start_loc.x, dest.x) - circle.radius;
+                    const max_x = circle.center.x + @max(start_loc.x, dest.x) + circle.radius;
+                    const min_y = circle.center.y + @min(start_loc.y, dest.y) - circle.radius;
+                    const max_y = circle.center.y + @max(start_loc.y, dest.y) + circle.radius;
+                    const w = max_x - min_x;
+                    const h = max_y - min_y;
+                    return ArrayWindow{
+                        .x = @intFromFloat(@floor(min_x / tile_size)),
+                        .y = @intFromFloat(@floor(min_y / tile_size)),
+                        .w = @as(usize, @intFromFloat(@ceil(w / tile_size))) + 1,
+                        .h = @as(usize, @intFromFloat(@ceil(h / tile_size))) + 1,
+                    };
+                },
+            }
+        }
     };
 }

@@ -7,9 +7,6 @@ const Vector = @import("vector.zig").Vector(f32);
 
 const sdl = @import("sdl3");
 
-// TODO: Have SAT hold its own arraylist that is cleared when needed,
-// pass the *arraylist to this shape to get the projection axes
-
 pub const aabb_projection_axes = [2]Vector{ point(1, 0), point(0, 1) };
 
 fn point(x: f32, y: f32) Vector {
@@ -20,14 +17,14 @@ pub const CollisionShape = union(enum) {
     pub const Self = @This();
 
     aabb: AABB,
-    Circle: Circle,
+    circle: Circle,
 
     pub fn getProjectionAxesCount(self: Self, other: Self) u32 {
         switch (self) {
             .aabb => return 2,
-            .Circle => switch (other) {
+            .circle => switch (other) {
                 .aabb => return 4,
-                .Circle => return 1,
+                .circle => return 1,
             },
         }
     }
@@ -47,11 +44,11 @@ pub const CollisionShape = union(enum) {
             .aabb => {
                 for (aabb_projection_axes) |axis| verticies.appendAssumeCapacity(axis);
             },
-            .Circle => |circle| switch (other) {
+            .circle => |circle| switch (other) {
                 .aabb => |aabb| {
                     circleToAABBProjectionAxes(verticies, circle, aabb, to_other);
                 },
-                .Circle => |other_circle| {
+                .circle => |other_circle| {
                     verticies.appendAssumeCapacity(other_circle.center.subtract(circle.center).add(to_other).normalize());
                 },
             },
@@ -69,7 +66,7 @@ pub const CollisionShape = union(enum) {
                 }
                 return projection;
             },
-            .Circle => |circle| {
+            .circle => |circle| {
                 const center_dot = axis.dotProduct(circle.center.add(loc));
                 return .init(center_dot - circle.radius, center_dot + circle.radius);
             },
@@ -116,7 +113,7 @@ pub const CollisionShape = union(enum) {
                     }
                 }
             },
-            .Circle => |circle| {
+            .circle => |circle| {
                 out.appendAssumeCapacity(circle.center.add(direction.scale(circle.radius)));
             },
         }

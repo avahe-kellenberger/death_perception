@@ -16,7 +16,7 @@ const max_speed = 65.0;
 pub const Player = struct {
     pub const Self = @This();
 
-    pub const collision_shape: CollisionShape = .{ .Circle = .init(Vector.Zero, 8.0) };
+    pub const collision_shape: CollisionShape = .{ .circle = .init(Vector.Zero, 8.0) };
 
     image: Texture,
     loc: Vector = .init(0, 0),

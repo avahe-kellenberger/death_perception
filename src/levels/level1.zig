@@ -75,18 +75,12 @@ pub const Level1 = struct {
 
         const tile_shape: CollisionShape = self.map.collision_shape;
 
-        const min_x: usize = @intFromFloat(@floor((@min(start_loc.x, self.player.loc.x) - Player.collision_shape.Circle.radius) / Map.tile_size));
-        const max_x: usize = @intFromFloat(@ceil((@max(start_loc.x, self.player.loc.x) + Player.collision_shape.Circle.radius) / Map.tile_size));
-
-        const min_y: usize = @intFromFloat(@floor((@min(start_loc.y, self.player.loc.y) - Player.collision_shape.Circle.radius) / Map.tile_size));
-        const max_y: usize = @intFromFloat(@ceil((@max(start_loc.y, self.player.loc.y) + Player.collision_shape.Circle.radius) / Map.tile_size));
-
-        var iter = self.map.tiles.window(.{
-            .x = min_x,
-            .y = min_y,
-            .w = max_x - min_x + 1,
-            .h = max_y - min_y + 1,
-        });
+        const movement_area = Map.getPotentialArea(
+            &Player.collision_shape,
+            self.player.loc,
+            self.player.loc.subtract(start_loc),
+        );
+        var iter = self.map.tiles.window(movement_area);
 
         while (iter.next()) |t| {
             if (!t.t.is_wall) continue;

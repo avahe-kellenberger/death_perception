@@ -8,8 +8,12 @@ const FRect = sdl.rect.FRect;
 const FPoint = sdl.rect.FPoint;
 
 const Camera = @import("camera.zig").Camera;
+const Input = @import("input.zig");
 
-const Level1 = @import("levels/level1.zig").Level1;
+const ui = @import("./ui/lib/component.zig");
+const MainMenu = @import("./ui/main_menu.zig");
+
+const Level1 = @import("./levels/level1.zig").Level1;
 
 pub const GameState = enum {
     main_menu,
@@ -22,9 +26,11 @@ pub const GameState = enum {
     game_over,
 };
 
-pub var state: GameState = .in_game;
+pub var state: GameState = .main_menu;
 pub var renderer: Renderer = undefined;
 pub var camera: Camera = undefined;
+
+pub var bg_color: sdl.pixels.Color = .{};
 
 var level: Level1 = undefined;
 
@@ -32,15 +38,23 @@ pub fn init(alloc: Allocator, _renderer: Renderer, _camera: Camera) void {
     renderer = _renderer;
     camera = _camera;
 
+    MainMenu.init(alloc);
+
     level = Level1.init(alloc);
     // TODO
 }
 
 pub fn deinit() void {
     level.deinit();
+    MainMenu.deinit();
 }
 
 pub fn update(frame_delay: f32) void {
+    if (Input.isPressed(.m)) {
+        state = .main_menu;
+    } else if (Input.isPressed(.g)) {
+        state = .in_game;
+    }
     switch (state) {
         .main_menu => {
             // TODO
@@ -70,9 +84,12 @@ pub fn update(frame_delay: f32) void {
 }
 
 pub fn render() void {
+    renderer.setDrawColor(bg_color) catch unreachable;
+    renderer.clear() catch unreachable;
+
     switch (state) {
         .main_menu => {
-            // TODO
+            MainMenu.render(camera.size.w, camera.size.h);
         },
         .lobby => {
             // TODO

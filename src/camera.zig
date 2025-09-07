@@ -15,7 +15,7 @@ pub const Camera = struct {
     _loc: FPoint,
 
     // Camera size (in screen coordinates)
-    _size: Size(f32),
+    size: Size(f32),
 
     // Camera zoom
     _z: f32 = 0,
@@ -26,7 +26,7 @@ pub const Camera = struct {
     pub fn init(loc: FPoint, size: Size(f32)) Camera {
         var cam: Camera = .{
             ._loc = loc,
-            ._size = size,
+            .size = size,
         };
         cam.updateViewport();
         return cam;
@@ -44,8 +44,8 @@ pub const Camera = struct {
     }
 
     pub fn setSize(self: *Self, w: f32, h: f32) void {
-        self._size.w = w;
-        self._size.h = h;
+        self.size.w = w;
+        self.size.h = h;
         self.updateViewport();
     }
 
@@ -56,8 +56,8 @@ pub const Camera = struct {
 
     fn updateViewport(self: *Self) void {
         if (self.getScale()) |scale| {
-            self.viewport.w = self._size.w / scale;
-            self.viewport.h = self._size.h / scale;
+            self.viewport.w = self.size.w / scale;
+            self.viewport.h = self.size.h / scale;
             self.viewport.x = self._loc.x - (self.viewport.w * 0.5);
             self.viewport.y = self._loc.y - (self.viewport.h * 0.5);
         }

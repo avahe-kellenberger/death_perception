@@ -72,7 +72,6 @@ const ValidationStatus = enum {
 /// Zero ID can be used as an invalid sentinel.
 var next_id: ComponentID = 1;
 
-/// TODO
 pub const Component = struct {
     const Self = @This();
 
@@ -110,8 +109,10 @@ pub const Component = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        // TODO deinit children
-        _ = self;
+        while (self.children.pop()) |kv| {
+            kv.value.deinit();
+        }
+        self.children.deinit(self.alloc);
     }
 
     /// Add a child component to this parent component.

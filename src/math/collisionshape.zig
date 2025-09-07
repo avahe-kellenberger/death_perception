@@ -2,68 +2,140 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
+const Game = @import("../game.zig");
+const Vector = @import("vector.zig").Vector(f32);
+
 const sdl = @import("sdl3");
-const FPoint = sdl.rect.FPoint;
 
-const aabb_projection_axes = [2]FPoint{ point(1, 0), point(0, 1) };
+// TODO: Have SAT hold its own arraylist that is cleared when needed,
+// pass the *arraylist to this shape to get the projection axes
 
-fn point(x: f32, y: f32) FPoint {
+pub const aabb_projection_axes = [2]Vector{ point(1, 0), point(0, 1) };
+
+fn point(x: f32, y: f32) Vector {
     return .{ .x = x, .y = y };
 }
 
 pub const CollisionShape = union(enum) {
     pub const Self = @This();
 
-    AABB: AABB,
+    aabb: AABB,
     Circle: Circle,
-    Polygon: Polygon,
+
+    pub fn getProjectionAxesCount(self: *Self, other: *CollisionShape) u32 {
+        switch (self) {
+            .aabb => return 2,
+            .Circle => switch (other) {
+                .aabb => return 4,
+                .Circle => return 1,
+            },
+        }
+    }
 
     /// Caller owns the returned memory.
     ///
     /// Generates projection axes facing away from this shape towards the given other shape.
     /// otherShape is the collision shape being tested against.
     /// toOther isa a vector from this shape's reference frame to the other shape's reference frame.
-    pub fn getProjectionAxes(self: *Self, alloc: Allocator, other: *CollisionShape, to_other: FPoint) []FPoint {
-        var result: ArrayList(FPoint) = undefined;
-
+    pub fn getProjectionAxes(
+        self: *Self,
+        verticies: *ArrayList(Vector),
+        other: *CollisionShape,
+        to_other: Vector,
+    ) void {
         switch (self) {
-            .AABB => |aabb| switch (other) {
-                .AABB => {
-                    result = .initCapacity(alloc, 2);
-                    for (aabb_projection_axes) |axis| result.append(alloc, axis) catch unreachable;
-                },
-                .Circle => {
-                    result = .initCapacity(alloc, 4);
-                    circleToAABBProjectionAxes(&result, self, aabb, to_other);
-                },
-                .Polygon => {
-                    //
-                },
+            .aabb => {
+                for (aabb_projection_axes) |axis| verticies.appendAssumeCapacity(axis);
             },
-            .Circle => |circle| {
-                const axes = circle.getProjectionAxes(self);
-                std.debug.print("Processing Circle with projection axes: {}\n", .{axes});
-            },
-            .Polygon => |polygon| {
-                const axes = polygon.getProjectionAxes(self);
-                std.debug.print("Processing Polygon with projection axes: {}\n", .{axes});
+            .Circle => |circle| switch (other) {
+                .aabb => |aabb| {
+                    circleToAABBProjectionAxes(&verticies, circle, aabb, to_other);
+                },
+                .Circle => |other_circle| {
+                    verticies.appendAssumeCapacity(other_circle.center.subtract(circle.center).add(to_other).normalize());
+                },
             },
         }
-        return result.toOwnedSlice(alloc);
+    }
+
+    pub fn project(self: Self, loc: Vector, axis: Vector) Vector {
+        switch (self) {
+            .aabb => |aabb| {
+                var projection = Vector.init(0, 0);
+                var dot_product: f32 = 0.0;
+
+                for (aabb.verticies()) |v| {
+                    dot_product = axis.dotProduct(v.add(loc));
+                    if (dot_product < projection.x) projection.x = dot_product;
+                    if (dot_product > projection.y) projection.y = dot_product;
+                }
+                return projection;
+            },
+            .Circle => |circle| {
+                const center_dot = axis.dotProduct(circle.center + loc);
+                return .init(center_dot - circle.radius, center_dot + circle.radius);
+            },
+        }
+    }
+
+    /// Assumes the ArrayList has enough capacity.
+    pub fn getFarthest(self: Self, direction: Vector, out: *ArrayList(Vector)) void {
+        switch (self) {
+            .aabb => |aabb| {
+                if (direction.x == 0) {
+                    if (direction.y > 0) {
+                        // Return bottom 2 verts
+                        out.appendAssumeCapacity(point(aabb.top_left.x, aabb.bottom_right.y));
+                        out.appendAssumeCapacity(aabb.bottom_right);
+                    } else if (direction.y < 0) {
+                        // Return top 2 verts
+                        out.appendAssumeCapacity(aabb.top_left);
+                        out.appendAssumeCapacity(point(self.bottom_right.x, self.top_left.y));
+                    }
+                } else if (direction.x > 0) {
+                    if (direction.y == 0) {
+                        // Return right 2 verts
+                        out.appendAssumeCapacity(point(aabb.bottom_right.x, aabb.top_left.y));
+                        out.appendAssumeCapacity(aabb.bottom_right);
+                    } else if (direction.y > 0) {
+                        // Bottom right
+                        out.appendAssumeCapacity(aabb.bottom_right);
+                    } else if (direction.y < 0) {
+                        // Top right
+                        out.appendAssumeCapacity(point(aabb.bottom_right.x, aabb.top_left.y));
+                    }
+                } else {
+                    if (direction.y == 0) {
+                        // Return left 2 verts
+                        out.appendAssumeCapacity(aabb.top_left);
+                        out.appendAssumeCapacity(point(aabb.top_left.x, aabb.bottom_right.y));
+                    } else if (direction.y > 0) {
+                        // Bottom left
+                        out.appendAssumeCapacity(point(aabb.top_left.x, aabb.bottom_right.y));
+                    } else if (direction.y < 0) {
+                        // Top left
+                        out.appendAssumeCapacity(aabb.top_left);
+                    }
+                }
+            },
+            .Circle => |circle| {
+                out.appendAssumeCapacity(direction.scale(circle.radius));
+            },
+        }
     }
 };
 
 pub const AABB = struct {
     pub const Self = @This();
 
-    top_left: FPoint,
-    bottom_right: FPoint,
+    top_left: Vector,
+    bottom_right: Vector,
 
-    pub fn init(top_left: FPoint, bottom_right: FPoint) AABB {
+    pub fn init(top_left: Vector, bottom_right: Vector) AABB {
         return AABB{ .top_left = top_left, .bottom_right = bottom_right };
     }
 
-    pub fn verticies(self: *Self) [4]FPoint {
+    pub fn verticies(self: *Self) [4]Vector {
         return .{
             self.top_left,
             point(self.bottom_right.x, self.top_left.y),
@@ -74,47 +146,29 @@ pub const AABB = struct {
 };
 
 pub const Circle = struct {
-    center: FPoint,
+    pub const Self = @This();
+
+    center: Vector,
     radius: f32,
 
-    pub fn init(center: FPoint, radius: f32) Circle {
+    pub fn init(center: Vector, radius: f32) Circle {
         return Circle{ .center = center, .radius = radius };
     }
-};
 
-pub const Polygon = struct {
-    vertices: []FPoint,
-
-    pub fn init(vertices: []FPoint) Polygon {
-        return Polygon{ .vertices = vertices };
+    pub fn render(self: Self) void {
+        _ = self;
+        // TODO:
     }
 };
 
+/// Assumes the provided list has enough capacity to add 4 vectors.
 fn circleToAABBProjectionAxes(
-    list: *ArrayList(FPoint),
+    list: *ArrayList(Vector),
     circle: Circle,
     aabb: AABB,
-    circle_to_aabb: FPoint,
+    circle_to_aabb: Vector,
 ) void {
-    // for every vertex v in aab,
-    // normalize(v - circle.center + circle_to_aabb)
-}
-
-test {
-    // const aabb = AABB.init(
-    //     FPoint{ .x = 0, .y = 0 },
-    //     FPoint{ .x = 1, .y = 1 },
-    // );
-    // const circle = Circle.init(FPoint{ .x = 0, .y = 0 }, 1.0);
-    //
-    // const polygon = Polygon.init(.{
-    //     FPoint{ .x = 0, .y = 0 },
-    //     FPoint{ .x = 1, .y = 0 },
-    //     FPoint{ .x = 0, .y = 1 },
-    // });
-    //
-    // // Example usage
-    // processCollisionShape(&CollisionShape{ .AABB = aabb });
-    // processCollisionShape(&CollisionShape{ .Circle = circle });
-    // processCollisionShape(&CollisionShape{ .Polygon = polygon });
+    for (aabb.verticies()) |v| {
+        list.appendAssumeCapacity(v.subtract(circle.center).add(circle_to_aabb).normalize());
+    }
 }

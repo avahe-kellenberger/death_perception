@@ -8,7 +8,7 @@ const FPoint = sdl.rect.FPoint;
 
 const Game = @import("game.zig");
 const Input = @import("input.zig");
-const Vector = @import("vector.zig").Vector;
+const Vector = @import("math/vector.zig").Vector(f32);
 
 const max_speed = 65.0;
 
@@ -35,14 +35,14 @@ pub const Player = struct {
     }
 
     pub fn update(self: *Self, dt: f32) void {
-        var vel: Vector = .{};
+        var vel: Vector = .init(0, 0);
         if (Input.isKeyPressed(.left)) vel.x -= max_speed;
         if (Input.isKeyPressed(.right)) vel.x += max_speed;
 
         if (Input.isKeyPressed(.up)) vel.y -= max_speed;
         if (Input.isKeyPressed(.down)) vel.y += max_speed;
 
-        vel = vel.maxMagnitude(max_speed);
+        vel = vel.normalize().scale(max_speed);
 
         self.loc.x += vel.x * dt;
         self.loc.y += vel.y * dt;

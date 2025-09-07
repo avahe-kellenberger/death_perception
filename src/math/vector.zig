@@ -7,9 +7,18 @@ const expectApproxEqAbs = std.testing.expectApproxEqAbs;
 pub fn Vector(T: type) type {
     return struct {
         pub const Self = @This();
+        pub const Zero = blk: switch (@typeInfo(T)) {
+            .float => break :blk vector(0, 0),
+            .int => break :blk ivector(0, 0),
+            else => unreachable,
+        };
 
         x: T,
         y: T,
+
+        pub fn init(x: T, y: T) Self {
+            return .{ .x = x, .y = y };
+        }
 
         pub fn add(self: Self, other: Self) Self {
             return .{ .x = self.x + other.x, .y = self.y + other.y };
@@ -17,6 +26,10 @@ pub fn Vector(T: type) type {
 
         pub fn subtract(self: Self, other: Self) Self {
             return .{ .x = self.x - other.x, .y = self.y - other.y };
+        }
+
+        pub fn scale(self: Self, scalar: f32) Self {
+            return .{ .x = self.x * scalar, .y = self.y * scalar };
         }
 
         pub fn getMagnitudeSquared(self: Self) f32 {
@@ -33,8 +46,8 @@ pub fn Vector(T: type) type {
         }
 
         pub fn normalize(self: Self) Self {
-            const scale = 1.0 / self.getMagnitude();
-            return .{ .x = self.x * scale, .y = self.y * scale };
+            const scalar = 1.0 / self.getMagnitude();
+            return .{ .x = self.x * scalar, .y = self.y * scalar };
         }
 
         pub fn distanceSquared(self: Self, other: Self) f32 {
@@ -62,6 +75,14 @@ pub fn Vector(T: type) type {
                 .int => return @floatFromInt(result),
                 else => unreachable,
             }
+        }
+
+        pub fn negate(self: Self) Self {
+            return .{ .x = -self.x, .y = -self.y };
+        }
+
+        pub fn perp(self: Self) Self {
+            return .init(-self.y, self.x);
         }
     };
 }

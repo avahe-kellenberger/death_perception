@@ -5,6 +5,8 @@ pub const ComponentSprite = struct {
 
     // TODO
 
+    pub fn deinit(_: *Self) void {}
+
     pub fn render(self: *const Self, content_area: Insets) void {
         _ = self;
         _ = content_area;

@@ -12,6 +12,15 @@ pub const ComponentContent = union(enum) {
     image: ComponentImage,
     sprite: ComponentSprite,
 
+    pub fn deinit(self: *Self) void {
+        switch (self.*) {
+            .none => {},
+            .text => |*t| t.deinit(),
+            .image => |*i| i.deinit(),
+            .sprite => |*s| s.deinit(),
+        }
+    }
+
     pub fn render(self: *const Self, content_area: Insets) void {
         switch (self.*) {
             .none => {},

@@ -66,6 +66,7 @@ pub const Component = struct {
             child.deinit();
         }
         self._children.deinit(self._alloc);
+        self.content.deinit();
     }
 
     /// Add a child component to this parent component.
@@ -276,12 +277,14 @@ pub const Component = struct {
         }
     }
 
-    fn updateBounds(self: *Self, x: f32, y: f32, width: f32, height: f32) void {
+    fn validateLayout(self: *Self) void {
+        if (self._layout_status == .valid) return;
+
         // Updates this component's bounds, and all children (deep).
-        self._bounds.left = x;
-        self._bounds.top = y;
-        self._bounds.right = x + width;
-        self._bounds.bottom = y + height;
+        self._bounds.left = 0;
+        self._bounds.top = 0;
+        self._bounds.right = self._width.pixelSize(0);
+        self._bounds.bottom = self._height.pixelSize(0);
         self.setLayoutStatus(.valid);
 
         self.updateChildrenBounds();
@@ -289,18 +292,13 @@ pub const Component = struct {
 
     fn updateChildrenBounds(self: *Self) void {
         if (self._children.count() == 0) return;
-        self.updateChildren(.vertical);
-        self.updateChildren(.horizontal);
-        for (self._children.values()) |*c| {
-            c.updateChildrenBounds();
-        }
-    }
-
-    fn updateChildren(self: *Self, comptime axis: StackDirection) void {
-        const alignment = if (axis == .horizontal) self._align_h else self._align_v;
-        alignment.process(self, axis);
+        self._align_v.process(self, .vertical);
+        self._align_h.process(self, .horizontal);
         for (self._children.values()) |*c| {
             c.setLayoutStatus(.valid);
+        }
+        for (self._children.values()) |*c| {
+            c.updateChildrenBounds();
         }
     }
 
@@ -316,38 +314,14 @@ pub const Component = struct {
             return;
         }
 
-        const clipped_render_bounds: Insets = .{
-            .left = @max(parent_bounds.left, self._bounds.left),
-            .top = @max(parent_bounds.top, self._bounds.top),
-            .right = @min(parent_bounds.right, self._bounds.right),
-            .bottom = @min(parent_bounds.bottom, self._bounds.bottom),
-        };
+        const clipped_render_bounds: Insets = parent_bounds.intersect(&self._bounds);
 
-        const floor_left: i32 = @intFromFloat(@floor(clipped_render_bounds.left));
-        const floor_top: i32 = @intFromFloat(@floor(clipped_render_bounds.top));
-        const ceil_right: i32 = @intFromFloat(@ceil(clipped_render_bounds.right));
-        const ceil_bottom: i32 = @intFromFloat(@ceil(clipped_render_bounds.bottom));
-        Game.renderer.setClipRect(.{
-            .x = floor_left,
-            .y = floor_top,
-            .w = ceil_right - floor_left,
-            .h = ceil_bottom - floor_top,
-        }) catch unreachable;
+        Game.renderer.setClipRect(clipped_render_bounds.irect()) catch unreachable;
         defer Game.renderer.setClipRect(null) catch unreachable;
 
         if (self.background_color.a != 0) {
-            Game.renderer.setDrawColor(.{
-                .r = self.background_color.r,
-                .g = self.background_color.g,
-                .b = self.background_color.b,
-                .a = self.background_color.a,
-            }) catch unreachable;
-            Game.renderer.renderFillRect(.{
-                .x = self._bounds.left,
-                .y = self._bounds.top,
-                .w = self._bounds.right - self._bounds.left,
-                .h = self._bounds.bottom - self._bounds.top,
-            }) catch unreachable;
+            Game.renderer.setDrawColor(self.background_color.into()) catch unreachable;
+            Game.renderer.renderFillRect(self._bounds.frect()) catch unreachable;
         }
 
         if (self._border_width > 0) {
@@ -361,7 +335,13 @@ pub const Component = struct {
             // TODO
         }
 
-        self.content.render(clipped_render_bounds);
+        const content_area: Insets = .{
+            .left = self._bounds.left + self._padding.left + self._border_width,
+            .top = self._bounds.top + self._padding.top + self._border_width,
+            .right = self._bounds.right - self._padding.right - self._border_width,
+            .bottom = self._bounds.bottom - self._padding.bottom - self._border_width,
+        };
+        self.content.render(content_area);
 
         for (self._children.values()) |*child| {
             child.render(clipped_render_bounds);
@@ -373,13 +353,6 @@ pub const Component = struct {
 pub fn render(root: *Component, width: f32, height: f32) void {
     root.setWidth(width);
     root.setHeight(height);
-
-    switch (root._layout_status) {
-        .valid => {},
-        .invalid, .invalid_child => {
-            root.updateBounds(0, 0, width, height);
-        },
-    }
-
+    root.validateLayout();
     root.render(Insets.inf);
 }

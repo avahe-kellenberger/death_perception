@@ -30,10 +30,16 @@ pub fn init(alloc: Allocator) void {
 
     var two = UIComponent.init(alloc);
     two.setMarginInsets(.{ .right = 50 });
+    two.setPadding(10);
     two.setWidth(200);
     two.setHeight(200);
     two.background_color = .{
         .g = 255,
+    };
+    two.content = .{
+        .text = .{
+            .content = .borrow("HELLO"),
+        },
     };
     box.add(two);
 

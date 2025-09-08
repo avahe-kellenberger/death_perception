@@ -1,4 +1,5 @@
 const std = @import("std");
+const sdl = @import("sdl3");
 
 pub const StackDirection = enum {
     vertical,
@@ -57,6 +58,37 @@ pub const Insets = struct {
 
     pub fn height(self: *const Self) f32 {
         return self.bottom - self.top;
+    }
+
+    pub fn intersect(self: *const Self, other: *const Self) Self {
+        return .{
+            .left = @max(self.left, other.left),
+            .top = @max(self.top, other.top),
+            .right = @min(self.right, other.right),
+            .bottom = @min(self.bottom, other.bottom),
+        };
+    }
+
+    pub fn frect(self: *const Self) sdl.rect.FRect {
+        return .{
+            .x = self.left,
+            .y = self.top,
+            .w = self.right - self.left,
+            .h = self.bottom - self.top,
+        };
+    }
+
+    pub fn irect(self: *const Self) sdl.rect.IRect {
+        const floor_left: i32 = @intFromFloat(@floor(self.left));
+        const floor_top: i32 = @intFromFloat(@floor(self.top));
+        const ceil_right: i32 = @intFromFloat(@ceil(self.right));
+        const ceil_bottom: i32 = @intFromFloat(@ceil(self.bottom));
+        return .{
+            .x = floor_left,
+            .y = floor_top,
+            .w = ceil_right - floor_left,
+            .h = ceil_bottom - floor_top,
+        };
     }
 
     pub fn equals(self: *const Self, other: *const Self) bool {

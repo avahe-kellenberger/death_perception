@@ -10,9 +10,9 @@ var root: ?UIComponent = null;
 
 pub fn init(alloc: Allocator) void {
     var box = UIComponent.init(alloc);
-    box.stackDirection = .horizontal;
-    box.alignHorizontal = .center;
-    box.alignVertical = .center;
+    box.setStackDirection(.horizontal);
+    box.setHorizontalAlignment(.center);
+    box.setVerticalAlignment(.center);
     box.background_color = .{
         .r = 50,
         .g = 50,
@@ -20,7 +20,7 @@ pub fn init(alloc: Allocator) void {
     };
 
     var one = UIComponent.init(alloc);
-    one.margin = .{ .right = 50 };
+    one.setMarginInsets(.{ .right = 50 });
     one.setWidth(200);
     one.setHeight(200);
     one.background_color = .{
@@ -29,7 +29,7 @@ pub fn init(alloc: Allocator) void {
     box.add(one);
 
     var two = UIComponent.init(alloc);
-    two.margin = .{ .right = 50 };
+    two.setMarginInsets(.{ .right = 50 });
     two.setWidth(200);
     two.setHeight(200);
     two.background_color = .{
@@ -46,7 +46,7 @@ pub fn init(alloc: Allocator) void {
     box.add(three);
 
     var r = UIComponent.init(alloc);
-    r.padding = .{ .left = 50, .top = 50, .right = 50, .bottom = 50 };
+    r.setPadding(50);
     r.add(box);
 
     root = r;

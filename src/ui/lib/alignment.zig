@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const StackDirection = @import("./stack.zig").StackDirection;
+const StackDirection = @import("./types.zig").StackDirection;
 const Component = @import("./component.zig").Component;
 
 pub const Alignment = enum {
@@ -23,7 +23,7 @@ pub const Alignment = enum {
 
 fn alignStart(comp: *Component, comptime axis: StackDirection) void {
     // Aligns children along the given axis with Alignment.start
-    if (axis == comp.stackDirection) {
+    if (axis == comp._stack_direction) {
         alignStartMainAxis(comp, axis);
     } else {
         alignStartCrossAxis(comp, axis);
@@ -32,7 +32,7 @@ fn alignStart(comp: *Component, comptime axis: StackDirection) void {
 
 fn alignCenter(comp: *Component, comptime axis: StackDirection) void {
     // Aligns children along the given axis with Alignment.center
-    if (axis == comp.stackDirection) {
+    if (axis == comp._stack_direction) {
         alignCenterMainAxis(comp, axis);
     } else {
         alignCenterCrossAxis(comp, axis);
@@ -41,7 +41,7 @@ fn alignCenter(comp: *Component, comptime axis: StackDirection) void {
 
 fn alignEnd(comp: *Component, comptime axis: StackDirection) void {
     // Aligns children along the given axis with Alignment.end
-    if (axis == comp.stackDirection) {
+    if (axis == comp._stack_direction) {
         alignEndMainAxis(comp, axis);
     } else {
         alignEndCrossAxis(comp, axis);
@@ -50,7 +50,7 @@ fn alignEnd(comp: *Component, comptime axis: StackDirection) void {
 
 fn alignSpaceEvenly(comp: *Component, comptime axis: StackDirection) void {
     // Aligns children along the given axis with Alignment.space_evenly
-    if (axis == comp.stackDirection) {
+    if (axis == comp._stack_direction) {
         alignSpaceEvenlyMainAxis(comp, axis);
     } else {
         // NOTE: Intentionally use "center" cross axis algorithm
@@ -64,16 +64,16 @@ fn alignSpaceEvenly(comp: *Component, comptime axis: StackDirection) void {
 
 fn alignStartMainAxis(comp: *Component, comptime axis: StackDirection) void {
     var child_start = if (axis == .horizontal)
-        comp.bounds.left + comp.border_width + comp.padding.left
+        comp._bounds.left + comp._border_width + comp._padding.left
     else
-        comp.bounds.top + comp.border_width + comp.padding.top;
+        comp._bounds.top + comp._border_width + comp._padding.top;
 
     const max_child_len = determineDynamicChildLenMainAxis(comp, axis);
 
     var prev_child: ?*Component = null;
 
-    for (comp.children.values()) |*child| {
-        if (!child.visible and !child.enabled) {
+    for (comp._children.values()) |*child| {
+        if (!child._visible and !child._enabled) {
             layout(child, axis, 0, 0);
             continue;
         }
@@ -100,14 +100,14 @@ fn alignStartMainAxis(comp: *Component, comptime axis: StackDirection) void {
 
 fn alignStartCrossAxis(comp: *Component, comptime axis: StackDirection) void {
     const child_start = if (axis == .horizontal)
-        comp.bounds.left + comp.border_width + comp.padding.left
+        comp._bounds.left + comp._border_width + comp._padding.left
     else
-        comp.bounds.top + comp.border_width + comp.padding.top;
+        comp._bounds.top + comp._border_width + comp._padding.top;
 
     const max_child_len = determineDynamicChildLenCrossAxis(comp, axis);
 
-    for (comp.children.values()) |*child| {
-        if (!child.visible and !child.enabled) {
+    for (comp._children.values()) |*child| {
+        if (!child._visible and !child._enabled) {
             layout(child, axis, 0, 0);
             continue;
         }
@@ -128,8 +128,8 @@ fn alignCenterMainAxis(comp: *Component, comptime axis: StackDirection) void {
     var last_margin: f32 = 0.0;
     var prev_child: ?*Component = null;
 
-    for (comp.children.values()) |*child| {
-        if (!child.visible and !child.enabled) {
+    for (comp._children.values()) |*child| {
+        if (!child._visible and !child._enabled) {
             layout(child, axis, 0, 0);
             continue;
         }
@@ -163,7 +163,7 @@ fn alignCenterMainAxis(comp: *Component, comptime axis: StackDirection) void {
     prev_child = null;
 
     const total_children_len_without_outer_margins = total_children_len - first_margin - last_margin;
-    const comp_start = startBounds(comp, axis) + startPadding(comp, axis) + comp.border_width;
+    const comp_start = startBounds(comp, axis) + startPadding(comp, axis) + comp._border_width;
 
     var child_start = comp_start;
 
@@ -172,7 +172,7 @@ fn alignCenterMainAxis(comp: *Component, comptime axis: StackDirection) void {
     } else {
         child_start += (total_available_len / 2.0) - (total_children_len_without_outer_margins / 2.0) - first_margin;
 
-        const comp_end = endBounds(comp, axis) - endPadding(comp, axis) - comp.border_width;
+        const comp_end = endBounds(comp, axis) - endPadding(comp, axis) - comp._border_width;
         if (child_start < comp_start) {
             child_start = comp_start;
         } else if (child_start + total_children_len > comp_end) {
@@ -180,8 +180,8 @@ fn alignCenterMainAxis(comp: *Component, comptime axis: StackDirection) void {
         }
     }
 
-    for (comp.children.values()) |*child| {
-        if (!child.visible and !child.enabled) {
+    for (comp._children.values()) |*child| {
+        if (!child._visible and !child._enabled) {
             continue;
         }
 
@@ -207,11 +207,11 @@ fn alignCenterMainAxis(comp: *Component, comptime axis: StackDirection) void {
 
 fn alignCenterCrossAxis(comp: *Component, comptime axis: StackDirection) void {
     const total_available_len = determineDynamicChildLenCrossAxis(comp, axis);
-    const parent_start = startBounds(comp, axis) + startPadding(comp, axis) + comp.border_width;
+    const parent_start = startBounds(comp, axis) + startPadding(comp, axis) + comp._border_width;
     const center = parent_start + (total_available_len / 2.0);
 
-    for (comp.children.values()) |*child| {
-        if (!child.visible and !child.enabled) {
+    for (comp._children.values()) |*child| {
+        if (!child._visible and !child._enabled) {
             layout(child, axis, 0, 0);
             continue;
         }
@@ -230,7 +230,7 @@ fn alignCenterCrossAxis(comp: *Component, comptime axis: StackDirection) void {
             parent_start + child_start_margin
         else result: {
             // Check if child needs to be pushed away from parent end (bottom or right)
-            const parent_end = endBounds(comp, axis) + comp.border_width + endPadding(comp, axis);
+            const parent_end = endBounds(comp, axis) + comp._border_width + endPadding(comp, axis);
             const child_end = preferred_child_start + child_len + endMargin(child, axis);
             break :result if (child_end > parent_end) parent_end - child_len - child_end_margin else preferred_child_start;
         };
@@ -245,8 +245,8 @@ fn alignEndMainAxis(comp: *Component, comptime axis: StackDirection) void {
     var total_children_len: f32 = 0;
     var prev_child: ?*Component = null;
 
-    for (comp.children.values()) |*child| {
-        if (!child.visible and !child.enabled) {
+    for (comp._children.values()) |*child| {
+        if (!child._visible and !child._enabled) {
             layout(child, axis, 0, 0);
             continue;
         }
@@ -274,10 +274,10 @@ fn alignEndMainAxis(comp: *Component, comptime axis: StackDirection) void {
     // Set child positions and sizes
     prev_child = null;
 
-    var child_start = endBounds(comp, axis) - endPadding(comp, axis) - comp.border_width - total_children_len;
+    var child_start = endBounds(comp, axis) - endPadding(comp, axis) - comp._border_width - total_children_len;
 
-    for (comp.children.values()) |*child| {
-        if (!child.visible and !child.enabled) {
+    for (comp._children.values()) |*child| {
+        if (!child._visible and !child._enabled) {
             continue;
         }
 
@@ -304,11 +304,11 @@ fn alignEndMainAxis(comp: *Component, comptime axis: StackDirection) void {
 
 fn alignEndCrossAxis(comp: *Component, comptime axis: StackDirection) void {
     const max_child_len = determineDynamicChildLenCrossAxis(comp, axis);
-    const end_pos = endBounds(comp, axis) - endPadding(comp, axis) - comp.border_width;
+    const end_pos = endBounds(comp, axis) - endPadding(comp, axis) - comp._border_width;
     const total_available_len = len(comp, axis) - totalPaddingAndBorders(comp, axis);
 
-    for (comp.children.values()) |*child| {
-        if (!child.visible and !child.enabled) {
+    for (comp._children.values()) |*child| {
+        if (!child._visible and !child._enabled) {
             layout(child, axis, 0, 0);
             continue;
         }
@@ -326,13 +326,13 @@ fn alignSpaceEvenlyMainAxis(comp: *Component, comptime axis: StackDirection) voi
     const max_child_len = determineDynamicChildLenMainAxis(comp, axis);
 
     var total_children_len: f32 = 0.0;
-    var margins: MarginQueue = .init(comp.alloc, {});
+    var margins: MarginQueue = .init(comp._alloc, {});
     defer margins.deinit();
     var prev_child: ?*Component = null;
 
     // Calculate the total length all children use up
-    for (comp.children.values()) |*child| {
-        if (!child.visible and !child.enabled) {
+    for (comp._children.values()) |*child| {
+        if (!child._visible and !child._enabled) {
             layout(child, axis, 0, 0);
             continue;
         }
@@ -359,7 +359,7 @@ fn alignSpaceEvenlyMainAxis(comp: *Component, comptime axis: StackDirection) voi
 
     // Calculate the gap size and remaining space in the parent
     var remaining_space = total_available_len - total_children_len;
-    var i = comp.children.count() + 1;
+    var i = comp._children.count() + 1;
     var gap: f32 = if (remaining_space < 0) 0.0 else (remaining_space / @as(f32, @floatFromInt(i)));
 
     while (margins.removeOrNull()) |margin| {
@@ -372,9 +372,9 @@ fn alignSpaceEvenlyMainAxis(comp: *Component, comptime axis: StackDirection) voi
         gap = if (remaining_space < 0) 0.0 else remaining_space / @as(f32, @floatFromInt(i));
     }
 
-    var child_start = startBounds(comp, axis) + startPadding(comp, axis) + comp.border_width;
-    for (comp.children.values()) |*child| {
-        if (!child.visible and !child.enabled) {
+    var child_start = startBounds(comp, axis) + startPadding(comp, axis) + comp._border_width;
+    for (comp._children.values()) |*child| {
+        if (!child._visible and !child._enabled) {
             continue;
         }
 
@@ -411,11 +411,11 @@ const MarginQueue = std.PriorityQueue(f32, void, max);
 
 fn layout(comp: *Component, comptime axis: StackDirection, start: f32, length: f32) void {
     if (axis == .horizontal) {
-        comp.bounds.left = start;
-        comp.bounds.right = start + length;
+        comp._bounds.left = start;
+        comp._bounds.right = start + length;
     } else {
-        comp.bounds.top = start;
-        comp.bounds.bottom = start + length;
+        comp._bounds.top = start;
+        comp._bounds.bottom = start + length;
     }
 }
 
@@ -425,39 +425,39 @@ fn pixelLen(parent: *const Component, child: *const Component, comptime axis: St
 }
 
 fn pixelLen2(comp: *const Component, axis_len: f32, comptime axis: StackDirection) f32 {
-    return if (axis == .horizontal) comp.width.pixelSize(axis_len) else comp.height.pixelSize(axis_len);
+    return if (axis == .horizontal) comp._width.pixelSize(axis_len) else comp._height.pixelSize(axis_len);
 }
 
 fn totalPaddingAndBorders(comp: *const Component, comptime axis: StackDirection) f32 {
-    return if (axis == .horizontal) comp.padding.left + comp.padding.right + comp.border_width * 2 else comp.padding.top + comp.padding.bottom + comp.border_width * 2;
+    return if (axis == .horizontal) comp._padding.left + comp._padding.right + comp._border_width * 2 else comp._padding.top + comp._padding.bottom + comp._border_width * 2;
 }
 
 fn len(comp: *const Component, comptime axis: StackDirection) f32 {
-    return if (axis == .horizontal) comp.bounds.width() else comp.bounds.height();
+    return if (axis == .horizontal) comp._bounds.width() else comp._bounds.height();
 }
 
 fn startMargin(comp: *const Component, comptime axis: StackDirection) f32 {
-    return if (axis == .horizontal) comp.margin.left else comp.margin.top;
+    return if (axis == .horizontal) comp._margin.left else comp._margin.top;
 }
 
 fn endMargin(comp: *const Component, comptime axis: StackDirection) f32 {
-    return if (axis == .horizontal) comp.margin.right else comp.margin.bottom;
+    return if (axis == .horizontal) comp._margin.right else comp._margin.bottom;
 }
 
 fn startPadding(comp: *const Component, comptime axis: StackDirection) f32 {
-    return if (axis == .horizontal) comp.padding.left else comp.padding.top;
+    return if (axis == .horizontal) comp._padding.left else comp._padding.top;
 }
 
 fn endPadding(comp: *const Component, comptime axis: StackDirection) f32 {
-    return if (axis == .horizontal) comp.padding.right else comp.padding.bottom;
+    return if (axis == .horizontal) comp._padding.right else comp._padding.bottom;
 }
 
 fn startBounds(comp: *const Component, comptime axis: StackDirection) f32 {
-    return if (axis == .horizontal) comp.bounds.left else comp.bounds.top;
+    return if (axis == .horizontal) comp._bounds.left else comp._bounds.top;
 }
 
 fn endBounds(comp: *const Component, comptime axis: StackDirection) f32 {
-    return if (axis == .horizontal) comp.bounds.right else comp.bounds.bottom;
+    return if (axis == .horizontal) comp._bounds.right else comp._bounds.bottom;
 }
 
 fn determineDynamicChildLenMainAxis(comp: *Component, comptime axis: StackDirection) f32 {
@@ -465,10 +465,10 @@ fn determineDynamicChildLenMainAxis(comp: *Component, comptime axis: StackDirect
 
     var unreserved_len = total_available_len;
     var prev_child: ?*Component = null;
-    var num_children_without_fixed_len = comp.children.count();
+    var num_children_without_fixed_len = comp._children.count();
 
-    for (comp.children.values()) |*child| {
-        if (!child.visible and !child.enabled) {
+    for (comp._children.values()) |*child| {
+        if (!child._visible and !child._enabled) {
             num_children_without_fixed_len -= 1;
             continue;
         }

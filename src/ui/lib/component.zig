@@ -101,27 +101,17 @@ pub const Component = struct {
     border_color: Color = .black,
 
     pub fn init(alloc: Allocator) Self {
-        // Dummy defaults that get overridden.
-        var result: Self = .{ .id = 0, .alloc = alloc };
-        result._init(alloc);
-        return result;
-    }
-
-    pub fn allocInit(alloc: Allocator) *Self {
-        var result = alloc.create(Self) catch unreachable;
-        result._init(alloc);
-        return result;
-    }
-
-    fn _init(self: *Self, alloc: Allocator) void {
         defer next_id += 1;
-        self.id = next_id;
-        self.alloc = alloc;
+        return .{
+            .id = next_id,
+            .alloc = alloc,
+        };
     }
 
     pub fn deinit(self: *Self) void {
         while (self.children.pop()) |kv| {
-            kv.value.deinit();
+            var child = kv.value;
+            child.deinit();
         }
         self.children.deinit(self.alloc);
     }

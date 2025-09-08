@@ -6,7 +6,7 @@ const Allocator = std.mem.Allocator;
 const ui = @import("./lib/component.zig");
 const UIComponent = ui.Component;
 
-var root: ?*UIComponent = null;
+var root: ?UIComponent = null;
 
 pub fn init(alloc: Allocator) void {
     var box = UIComponent.init(alloc);
@@ -45,7 +45,7 @@ pub fn init(alloc: Allocator) void {
     };
     box.add(three);
 
-    var r = UIComponent.allocInit(alloc);
+    var r = UIComponent.init(alloc);
     r.padding = .{ .left = 50, .top = 50, .right = 50, .bottom = 50 };
     r.add(box);
 
@@ -53,7 +53,10 @@ pub fn init(alloc: Allocator) void {
 }
 
 pub fn deinit() void {
-    if (root) |r| r.deinit();
+    if (root) |*r| {
+        r.deinit();
+        root = null;
+    }
 }
 
 pub fn render(width: f32, height: f32) void {

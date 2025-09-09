@@ -370,9 +370,11 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             }
         }
 
-        fn getTileData(self: *Self, x: f32, y: f32) TileData {
+        fn getTileData(self: *Self, x: f32, y: f32, dx: f32, dy: f32) TileData {
             const _x = @as(usize, @intFromFloat(@floor(x / tile_size)));
             const _y = @as(usize, @intFromFloat(@floor(y / tile_size)));
+            if (dx < 0) _x -= 1;
+            if (dy < 0) _y -= 1;
             return .{
                 .x = _x,
                 .y = _y,
@@ -400,47 +402,69 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             defer tiles_hit.deinit(self.alloc);
 
             // Add the starting tile
-            tiles_hit.append(self.alloc, self.getTileData(start.x, start.y)) catch unreachable;
+            tiles_hit.append(self.alloc, self.getTileData(start.x, start.y, dx, dy)) catch unreachable;
 
-            const end_tile = self.getTileData(end.x, end.y);
+            const end_tile = self.getTileData(end.x, end.y, dx, dy);
 
             const slope = if (dx == 0) std.math.inf(f32) else @abs(round(dy / dx));
             var current_loc: Vector = start;
 
+            const sign_x: i32 = @intFromFloat(std.math.sign(dx));
+            const sign_y: i32 = @intFromFloat(std.math.sign(dy));
+            const sign_joined: f32 = @floatFromInt(sign_x | sign_y);
+
             for (0..max_iterations) |i| {
+                std.log.err("x: {}, y: {}", .{ x_dir, y_dir });
                 const dist_to_tile: Vector = .{
                     .x = switch (x_dir) {
                         .neutral => std.math.inf(f32),
                         .positive => tile_size - round(@mod(current_loc.x, tile_size)),
-                        .negative => round(@rem(current_loc.x, tile_size)) - tile_size,
+                        .negative => blk: {
+                            const res = -1.0 * round(@mod(current_loc.x, tile_size));
+                            if (res == 0) {
+                                break :blk -16.0;
+                            }
+                            break :blk res;
+                        },
                     },
                     .y = switch (y_dir) {
                         .neutral => std.math.inf(f32),
                         .positive => tile_size - round(@mod(current_loc.y, tile_size)),
-                        .negative => round(@rem(current_loc.y, tile_size)) - tile_size,
+                        .negative => blk: {
+                            const res = -1.0 * round(@mod(current_loc.y, tile_size));
+                            if (res == 0) {
+                                break :blk -16.0;
+                            }
+                            break :blk res;
+                        },
                     },
                 };
 
+                std.log.err("curr: {}", .{current_loc});
+                std.log.err("dist: {}", .{dist_to_tile});
+
                 if (@abs(dist_to_tile.x * slope) < @abs(dist_to_tile.y)) {
+                    std.log.err("Move in X direction...\n", .{});
                     switch (x_dir) {
                         .neutral => unreachable,
                         .positive, .negative => {
                             current_loc.x += dist_to_tile.x;
-                            current_loc.y += round(dist_to_tile.x * slope);
+                            current_loc.y += sign_joined * round(dist_to_tile.x * slope);
                         },
                     }
                 } else {
+                    std.log.err("Move in Y direction...", .{});
                     switch (y_dir) {
                         .neutral => unreachable,
                         .positive, .negative => {
-                            current_loc.x += round(dist_to_tile.y / slope);
+                            current_loc.x += sign_joined * round(dist_to_tile.y / slope);
                             current_loc.y += dist_to_tile.y;
+                            std.log.err("New Y: {}\n", .{current_loc.y});
                         },
                     }
                 }
 
-                // NOTE: This can add the current tile again if moving in a negative direction
-                const current = self.getTileData(current_loc.x, current_loc.y);
+                const current = self.getTileData(current_loc.x, current_loc.y, dx, dy);
                 tiles_hit.append(self.alloc, current) catch unreachable;
 
                 if (current.x == end_tile.x and current.y == end_tile.y) break;

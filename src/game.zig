@@ -103,8 +103,6 @@ pub fn render() void {
             if (camera.getScale()) |scale| {
                 renderer.setScale(scale, scale) catch unreachable;
 
-                renderer.setDrawColor(bg_color) catch unreachable;
-                renderer.clear() catch unreachable;
                 level.render();
 
                 renderer.setScale(1, 1) catch unreachable;

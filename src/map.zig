@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 
 const sdl = @import("sdl3");
@@ -27,8 +28,8 @@ pub const Tile = struct {
 
 pub const TileData = struct {
     tile: *Tile,
-    x: u32,
-    y: u32,
+    x: usize,
+    y: usize,
 };
 
 pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type {
@@ -337,52 +338,6 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             }
         }
 
-        /// Finds all tiles intersecting with the raycast.
-        /// Caller owns the returned data.
-        pub fn raycast(self: *Self, start: Vector, end: Vector) []TileData {
-            const dx = end.x - start.x;
-            const dy = end.y - start.y;
-
-            const steps: usize = @intFromFloat(@max(@abs(dx), @abs(dy)) / tile_size + 1);
-
-            const x_increment = dx / @as(f32, @floatFromInt(steps));
-            const y_increment = dy / @as(f32, @floatFromInt(steps));
-
-            var current_x = start.x;
-            var current_y = start.y;
-
-            var tiles_hit: std.ArrayList(TileData) = .empty;
-            defer tiles_hit.deinit(self.alloc);
-
-            // Add + 1 to ensure the last tile is found.
-            outer: for (0..steps + 1) |_| {
-                const tile_x: u32 = @intFromFloat(current_x / tile_size);
-                const tile_y: u32 = @intFromFloat(current_y / tile_size);
-                defer current_x += x_increment;
-                defer current_y += y_increment;
-
-                if (tile_x < 0 or tile_x >= width or tile_y < 0 or tile_y >= height) {
-                    // Out of bounds
-                    break;
-                }
-
-                const tile = self.tiles.get(tile_x, tile_y);
-                if (tile.is_wall) {
-                    for (tiles_hit.items) |hit| {
-                        // Make sure we don't add duplicate tiles.
-                        if (hit.x == tile_x and hit.y == tile_y) continue :outer;
-                    }
-
-                    tiles_hit.append(self.alloc, .{
-                        .tile = tile,
-                        .x = tile_x,
-                        .y = tile_y,
-                    }) catch unreachable;
-                }
-            }
-            return tiles_hit.toOwnedSlice(self.alloc) catch unreachable;
-        }
-
         pub fn getPotentialArea(shape: *const CollisionShape, start_loc: Vector, movement: Vector) ArrayWindow {
             switch (shape.*) {
                 .aabb => |aabb| {
@@ -413,6 +368,88 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                     };
                 },
             }
+        }
+
+        fn getTileData(self: *Self, x: f32, y: f32) TileData {
+            const _x = @as(usize, @intFromFloat(@floor(x / tile_size)));
+            const _y = @as(usize, @intFromFloat(@floor(y / tile_size)));
+            return .{
+                .x = _x,
+                .y = _y,
+                .tile = self.tiles.get(_x, _y),
+            };
+        }
+
+        fn round(x: f32) f32 {
+            var result = x * 1_000_000;
+            result = @round(result);
+            return result * 0.000001;
+        }
+
+        pub fn raycast(self: *Self, start: Vector, end: Vector) []TileData {
+            const max_iterations: usize = @intFromFloat(@ceil(end.distance(start) / (tile_size * 1.3)) * 2.0);
+
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+
+            const Direction = enum { positive, neutral, negative };
+            const x_dir: Direction = if (dx == 0) .neutral else if (dx > 0) .positive else .negative;
+            const y_dir: Direction = if (dy == 0) .neutral else if (dy > 0) .positive else .negative;
+
+            var tiles_hit: std.ArrayList(TileData) = .empty;
+            defer tiles_hit.deinit(self.alloc);
+
+            // Add the starting tile
+            tiles_hit.append(self.alloc, self.getTileData(start.x, start.y)) catch unreachable;
+
+            const end_tile = self.getTileData(end.x, end.y);
+
+            const slope = if (dx == 0) std.math.inf(f32) else @abs(round(dy / dx));
+            var current_loc: Vector = start;
+
+            for (0..max_iterations) |i| {
+                const dist_to_tile: Vector = .{
+                    .x = switch (x_dir) {
+                        .neutral => std.math.inf(f32),
+                        .positive => tile_size - round(@mod(current_loc.x, tile_size)),
+                        .negative => round(@rem(current_loc.x, tile_size)) - tile_size,
+                    },
+                    .y = switch (y_dir) {
+                        .neutral => std.math.inf(f32),
+                        .positive => tile_size - round(@mod(current_loc.y, tile_size)),
+                        .negative => round(@rem(current_loc.y, tile_size)) - tile_size,
+                    },
+                };
+
+                if (@abs(dist_to_tile.x * slope) < @abs(dist_to_tile.y)) {
+                    switch (x_dir) {
+                        .neutral => unreachable,
+                        .positive, .negative => {
+                            current_loc.x += dist_to_tile.x;
+                            current_loc.y += round(dist_to_tile.x * slope);
+                        },
+                    }
+                } else {
+                    switch (y_dir) {
+                        .neutral => unreachable,
+                        .positive, .negative => {
+                            current_loc.x += round(dist_to_tile.y / slope);
+                            current_loc.y += dist_to_tile.y;
+                        },
+                    }
+                }
+
+                // NOTE: This can add the current tile again if moving in a negative direction
+                const current = self.getTileData(current_loc.x, current_loc.y);
+                tiles_hit.append(self.alloc, current) catch unreachable;
+
+                if (current.x == end_tile.x and current.y == end_tile.y) break;
+
+                if (builtin.mode == .Debug and i == max_iterations - 1) {
+                    std.log.err("Failed to find raycast in {} iterations", .{i + 1});
+                }
+            }
+            return tiles_hit.toOwnedSlice(self.alloc) catch unreachable;
         }
     };
 }

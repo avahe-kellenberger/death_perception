@@ -9,6 +9,7 @@ const Vector = vector_mod.Vector(f32);
 const vector = vector_mod.vector;
 const FRect = sdl.rect.FRect;
 
+const Color = @import("../color.zig").Color;
 const collides = @import("../math/sat.zig").collides;
 
 const Game = @import("../game.zig");
@@ -20,10 +21,6 @@ const CollisionShape = @import("../math/collisionshape.zig").CollisionShape;
 const TileData = @import("../map.zig").TileData;
 
 const Map = @import("../map.zig").Map(144, 144, 16.0);
-
-const GREEN: sdl.pixels.Color = .{ .r = 0, .g = 255, .b = 0, .a = 100 };
-const RED: sdl.pixels.Color = .{ .r = 255, .g = 0, .b = 0, .a = 100 };
-const BLUE: sdl.pixels.Color = .{ .r = 0, .g = 0, .b = 255, .a = 100 };
 
 pub const Level1 = struct {
     pub const Self = @This();
@@ -137,11 +134,11 @@ pub const Level1 = struct {
         Game.setBlendMode(.blend);
 
         if (self.raycast_start_loc) |start| {
-            Game.fillRect(.{ .x = start.x - 1, .y = start.y - 1, .w = 2, .h = 2 }, GREEN);
+            Game.fillRect(.{ .x = start.x - 1, .y = start.y - 1, .w = 2, .h = 2 }, Color.red.into());
         }
 
         if (self.raycast_end_loc) |end| {
-            Game.fillRect(.{ .x = end.x - 1, .y = end.y - 1, .w = 2, .h = 2 }, RED);
+            Game.fillRect(.{ .x = end.x - 1, .y = end.y - 1, .w = 2, .h = 2 }, Color.red.into());
         }
 
         if (self.raycast_tiles) |tiles| for (tiles) |t| {
@@ -151,11 +148,11 @@ pub const Level1 = struct {
                 .w = Map.tile_size,
                 .h = Map.tile_size,
             };
-            Game.fillRect(rect, BLUE);
+            Game.fillRect(rect, Color.blue.into());
         };
 
         if (self.raycast_start_loc) |start| if (self.raycast_end_loc) |end| {
-            Game.renderer.setDrawColor(RED) catch unreachable;
+            Game.renderer.setDrawColor(Color.red.into()) catch unreachable;
             Game.renderer.renderLine(
                 .{ .x = start.x - Game.camera.viewport.x, .y = start.y - Game.camera.viewport.y },
                 .{ .x = end.x - Game.camera.viewport.x, .y = end.y - Game.camera.viewport.y },

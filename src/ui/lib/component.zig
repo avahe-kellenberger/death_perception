@@ -320,7 +320,7 @@ pub const Component = struct {
         defer Game.renderer.setClipRect(null) catch unreachable;
 
         if (self.background_color.a != 0) {
-            Game.renderer.setDrawColor(self.background_color.into()) catch unreachable;
+            Game.renderer.setDrawColor(self.background_color.sdl()) catch unreachable;
             Game.renderer.renderFillRect(self._bounds.frect()) catch unreachable;
         }
 

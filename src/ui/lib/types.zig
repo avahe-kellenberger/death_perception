@@ -1,6 +1,8 @@
 const std = @import("std");
 const sdl = @import("sdl3");
 
+const Vector = @import("../../math/vector.zig").Vector(f32);
+
 pub const StackDirection = enum {
     vertical,
     horizontal,
@@ -58,6 +60,13 @@ pub const Insets = struct {
 
     pub fn height(self: *const Self) f32 {
         return self.bottom - self.top;
+    }
+
+    pub fn center(self: *const Self) Vector {
+        return .init(
+            (self.left + self.right) / 2.0,
+            (self.top + self.bottom) / 2.0,
+        );
     }
 
     pub fn intersect(self: *const Self, other: *const Self) Self {

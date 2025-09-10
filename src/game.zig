@@ -56,7 +56,7 @@ pub fn update(frame_delay: f32) void {
     }
     switch (state) {
         .main_menu => {
-            // TODO
+            MainMenu.update(frame_delay);
         },
         .lobby => {
             // TODO

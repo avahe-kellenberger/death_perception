@@ -1,4 +1,4 @@
-const sdl = @import("sdl3");
+const sdl_ = @import("sdl3");
 
 pub const Color = struct {
     const Self = @This();
@@ -14,7 +14,11 @@ pub const Color = struct {
     pub const green: Color = .{ .g = 255 };
     pub const blue: Color = .{ .b = 255 };
 
-    pub fn into(self: *const Self) sdl.pixels.Color {
+    pub fn sdl(self: *const Self) sdl_.pixels.Color {
+        return .{ .r = self.r, .g = self.g, .b = self.b, .a = self.a };
+    }
+
+    pub fn ttf(self: *const Self) sdl_.ttf.Color {
         return .{ .r = self.r, .g = self.g, .b = self.b, .a = self.a };
     }
 };

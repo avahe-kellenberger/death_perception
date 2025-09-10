@@ -11,7 +11,7 @@ const Input = @import("input.zig");
 const Vector = @import("math/vector.zig").Vector(f32);
 const CollisionShape = @import("math/collisionshape.zig").CollisionShape;
 
-const max_speed = 65.0;
+const max_speed = 85.0 * Game.tile_size / 16.0;
 
 pub const Player = struct {
     pub const Self = @This();
@@ -20,16 +20,13 @@ pub const Player = struct {
 
     image: Texture,
     loc: Vector = .init(0, 0),
-    image_size: FPoint = undefined,
+    image_size: Vector = undefined,
 
     pub fn init() Player {
         const image = Game.loadTexture("./assets/images/player.png", .nearest);
         return .{
             .image = image,
-            .image_size = .{
-                .x = @as(f32, @floatFromInt(image.getWidth())),
-                .y = @as(f32, @floatFromInt(image.getHeight())),
-            },
+            .image_size = .{ .x = Game.tile_size, .y = Game.tile_size },
         };
     }
 
@@ -58,13 +55,5 @@ pub const Player = struct {
             .w = self.image_size.x,
             .h = self.image_size.y,
         });
-
-        Game.setBlendMode(.blend);
-        Game.fillRect(.{
-            .x = self.loc.x - self.image_size.x * 0.5,
-            .y = self.loc.y - self.image_size.y * 0.5,
-            .w = self.image_size.x,
-            .h = self.image_size.y,
-        }, .{ .r = 255, .g = 0, .b = 0, .a = 100 });
     }
 };

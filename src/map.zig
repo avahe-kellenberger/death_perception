@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 
 const sdl = @import("sdl3");
@@ -18,6 +19,8 @@ const vector = vector_mod.vector;
 
 const CollisionShape = @import("math/collisionshape.zig").CollisionShape;
 
+const Color = @import("color.zig").Color;
+
 pub const Tile = struct {
     floor_image_index: isize = -1,
     wall_image_index: isize = -1,
@@ -27,8 +30,8 @@ pub const Tile = struct {
 
 pub const TileData = struct {
     tile: *Tile,
-    x: u32,
-    y: u32,
+    x: usize,
+    y: usize,
 };
 
 pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type {
@@ -305,8 +308,8 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                         Game.renderTexture(self.floor_tiles_sheet.sheet, sprite_rect, .{
                             .x = @as(f32, @floatFromInt(e.x)) * tile_size,
                             .y = @as(f32, @floatFromInt(e.y)) * tile_size,
-                            .w = sprite_rect.w,
-                            .h = sprite_rect.h,
+                            .w = tile_size,
+                            .h = tile_size,
                         });
                     }
                 }
@@ -321,66 +324,12 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                         Game.renderTexture(self.wall_tiles_sheet.sheet, sprite_rect, .{
                             .x = @as(f32, @floatFromInt(e.x)) * tile_size,
                             .y = @as(f32, @floatFromInt(e.y)) * tile_size,
-                            .w = sprite_rect.w,
-                            .h = sprite_rect.h,
+                            .w = tile_size,
+                            .h = tile_size,
                         });
-
-                        Game.setBlendMode(.blend);
-                        Game.fillRect(.{
-                            .x = @as(f32, @floatFromInt(e.x)) * tile_size,
-                            .y = @as(f32, @floatFromInt(e.y)) * tile_size,
-                            .w = sprite_rect.w,
-                            .h = sprite_rect.h,
-                        }, .{ .r = 0, .g = 100, .b = 0, .a = 100 });
                     }
                 }
             }
-        }
-
-        /// Finds all tiles intersecting with the raycast.
-        /// Caller owns the returned data.
-        pub fn raycast(self: *Self, start: Vector, end: Vector) []TileData {
-            const dx = end.x - start.x;
-            const dy = end.y - start.y;
-
-            const steps: usize = @intFromFloat(@max(@abs(dx), @abs(dy)) / tile_size + 1);
-
-            const x_increment = dx / @as(f32, @floatFromInt(steps));
-            const y_increment = dy / @as(f32, @floatFromInt(steps));
-
-            var current_x = start.x;
-            var current_y = start.y;
-
-            var tiles_hit: std.ArrayList(TileData) = .empty;
-            defer tiles_hit.deinit(self.alloc);
-
-            // Add + 1 to ensure the last tile is found.
-            outer: for (0..steps + 1) |_| {
-                const tile_x: u32 = @intFromFloat(current_x / tile_size);
-                const tile_y: u32 = @intFromFloat(current_y / tile_size);
-                defer current_x += x_increment;
-                defer current_y += y_increment;
-
-                if (tile_x < 0 or tile_x >= width or tile_y < 0 or tile_y >= height) {
-                    // Out of bounds
-                    break;
-                }
-
-                const tile = self.tiles.get(tile_x, tile_y);
-                if (tile.is_wall) {
-                    for (tiles_hit.items) |hit| {
-                        // Make sure we don't add duplicate tiles.
-                        if (hit.x == tile_x and hit.y == tile_y) continue :outer;
-                    }
-
-                    tiles_hit.append(self.alloc, .{
-                        .tile = tile,
-                        .x = tile_x,
-                        .y = tile_y,
-                    }) catch unreachable;
-                }
-            }
-            return tiles_hit.toOwnedSlice(self.alloc) catch unreachable;
         }
 
         pub fn getPotentialArea(shape: *const CollisionShape, start_loc: Vector, movement: Vector) ArrayWindow {
@@ -414,5 +363,106 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 },
             }
         }
+
+        pub fn raycast(self: *Self, start: Vector, end: Vector) RaycastIterator {
+            return .init(self, start, end);
+        }
+
+        pub const RaycastIterator = struct {
+            map: *Self,
+            start: Vector,
+            end: Vector,
+
+            dx: f32,
+            dy: f32,
+            sign_x: isize,
+            sign_y: isize,
+            slope: f32,
+
+            current_loc: Vector,
+            next_tile: ?TileData,
+
+            pub fn init(map: *Self, start: Vector, end: Vector) RaycastIterator {
+                const dx = end.x - start.x;
+                const dy = end.y - start.y;
+                const sign_x: isize = @intFromFloat(std.math.sign(dx));
+                const sign_y: isize = @intFromFloat(std.math.sign(dy));
+                const slope = if (dx == 0) std.math.inf(f32) else dy / dx;
+                return .{
+                    .map = map,
+                    .start = start,
+                    .end = end,
+                    .dx = dx,
+                    .dy = dy,
+                    .sign_x = sign_x,
+                    .sign_y = sign_y,
+                    .slope = slope,
+                    .current_loc = start,
+                    .next_tile = determineTile(map, start),
+                };
+            }
+
+            fn getTileData(iter: *RaycastIterator, x: usize, y: usize) TileData {
+                return .{ .x = x, .y = y, .tile = iter.map.tiles.get(x, y) };
+            }
+
+            fn dispToTile(tile_coord: usize, loc: f32, sign: isize) f32 {
+                if (sign > 0) return tile_size + @as(f32, @floatFromInt(tile_coord)) * tile_size - loc;
+                return @as(f32, @floatFromInt(tile_coord)) * tile_size - loc;
+            }
+
+            fn determineTile(map: *Self, current_loc: Vector) TileData {
+                const tile_x = @as(usize, @intFromFloat(@floor(current_loc.x / tile_size)));
+                const tile_y = @as(usize, @intFromFloat(@floor(current_loc.y / tile_size)));
+                return .{ .x = tile_x, .y = tile_y, .tile = map.tiles.get(tile_x, tile_y) };
+            }
+
+            pub fn next(iter: *RaycastIterator) ?TileData {
+                const return_tile = iter.next_tile;
+                if (return_tile) |rt| {
+                    const disp_x = dispToTile(rt.x, iter.current_loc.x, iter.sign_x);
+                    const disp_y = dispToTile(rt.y, iter.current_loc.y, iter.sign_y);
+                    const slope_diff = @abs(disp_y) - @abs(disp_x * iter.slope);
+                    if (slope_diff > 0) {
+                        iter.current_loc.x += disp_x;
+                        iter.current_loc.y += disp_x * iter.slope;
+                        const new_x = @as(isize, @intCast(rt.x)) + iter.sign_x;
+                        if (new_x < 0 or new_x >= width) {
+                            iter.next_tile = null;
+                        } else {
+                            iter.next_tile = iter.getTileData(@as(usize, @intCast(new_x)), rt.y);
+                        }
+                    } else if (slope_diff < 0) {
+                        iter.current_loc.x += disp_y / iter.slope;
+                        iter.current_loc.y += disp_y;
+                        const new_y = @as(isize, @intCast(rt.y)) + iter.sign_y;
+                        if (new_y < 0 or new_y >= height) {
+                            iter.next_tile = null;
+                        } else {
+                            iter.next_tile = iter.getTileData(rt.x, @as(usize, @intCast(new_y)));
+                        }
+                    } else {
+                        // Going through intersection x and y at the same time
+                        iter.current_loc.x += disp_x;
+                        iter.current_loc.y += disp_y;
+                        const new_x = @as(isize, @intCast(rt.x)) + iter.sign_x;
+                        const new_y = @as(isize, @intCast(rt.y)) + iter.sign_y;
+                        if (new_x < 0 or new_x >= width or new_y < 0 or new_y >= height) {
+                            iter.next_tile = null;
+                        } else {
+                            iter.next_tile = iter.getTileData(
+                                @as(usize, @intCast(new_x)),
+                                @as(usize, @intCast(new_y)),
+                            );
+                        }
+                    }
+
+                    if (@abs(iter.current_loc.x - iter.start.x) >= @abs(iter.dx)) {
+                        iter.next_tile = null;
+                    }
+                }
+                return return_tile;
+            }
+        };
     };
 }

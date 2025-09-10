@@ -31,6 +31,8 @@ pub var renderer: Renderer = undefined;
 pub var camera: Camera = undefined;
 pub var bg_color: sdl.pixels.Color = .{};
 
+pub const tile_size: f32 = 16.0;
+
 var level: Level1 = undefined;
 
 pub fn init(alloc: Allocator, _renderer: Renderer, _camera: Camera) void {

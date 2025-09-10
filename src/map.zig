@@ -308,8 +308,8 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                         Game.renderTexture(self.floor_tiles_sheet.sheet, sprite_rect, .{
                             .x = @as(f32, @floatFromInt(e.x)) * tile_size,
                             .y = @as(f32, @floatFromInt(e.y)) * tile_size,
-                            .w = sprite_rect.w,
-                            .h = sprite_rect.h,
+                            .w = tile_size,
+                            .h = tile_size,
                         });
                     }
                 }
@@ -324,17 +324,9 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                         Game.renderTexture(self.wall_tiles_sheet.sheet, sprite_rect, .{
                             .x = @as(f32, @floatFromInt(e.x)) * tile_size,
                             .y = @as(f32, @floatFromInt(e.y)) * tile_size,
-                            .w = sprite_rect.w,
-                            .h = sprite_rect.h,
+                            .w = tile_size,
+                            .h = tile_size,
                         });
-
-                        Game.setBlendMode(.blend);
-                        Game.fillRect(.{
-                            .x = @as(f32, @floatFromInt(e.x)) * tile_size,
-                            .y = @as(f32, @floatFromInt(e.y)) * tile_size,
-                            .w = sprite_rect.w,
-                            .h = sprite_rect.h,
-                        }, .{ .r = 0, .g = 100, .b = 0, .a = 100 });
                     }
                 }
             }
@@ -372,91 +364,105 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             }
         }
 
-        fn determineTile(self: *Self, x: f32, y: f32, sign_x: i32, sign_y: i32) TileData {
-            var tile_x = @as(usize, @intFromFloat(@floor(x / tile_size)));
-            var tile_y = @as(usize, @intFromFloat(@floor(y / tile_size)));
-            if (sign_x < 0 and @mod(x, tile_size) == 0) tile_x -= 1;
-            if (sign_y < 0 and @mod(y, tile_size) == 0) tile_y -= 1;
-            return .{
-                .x = tile_x,
-                .y = tile_y,
-                .tile = self.tiles.get(tile_x, tile_y),
-            };
+        pub fn raycast(self: *Self, start: Vector, end: Vector) RaycastIterator {
+            return .init(self, start, end);
         }
 
-        fn getTileData(self: *Self, x: usize, y: usize) TileData {
-            return .{
-                .x = x,
-                .y = y,
-                .tile = self.tiles.get(x, y),
-            };
-        }
+        pub const RaycastIterator = struct {
+            map: *Self,
+            start: Vector,
+            end: Vector,
 
-        fn round(x: f32) f32 {
-            var result = x * 1_000_000;
-            result = @round(result);
-            return result * 0.000001;
-        }
+            dx: f32,
+            dy: f32,
+            sign_x: isize,
+            sign_y: isize,
+            slope: f32,
 
-        pub fn raycast(self: *Self, start: Vector, end: Vector) []TileData {
-            // TODO: Refine this value
-            const max_iterations: usize = @intFromFloat(@ceil(end.distance(start) / (tile_size * 1.3)) * 2.0);
+            current_loc: Vector,
+            next_tile: ?TileData,
 
-            const dx = end.x - start.x;
-            const dy = end.y - start.y;
-
-            const sign_x: i32 = @intFromFloat(std.math.sign(dx));
-            const sign_y: i32 = @intFromFloat(std.math.sign(dy));
-
-            const slope = if (dx == 0) std.math.inf(f32) else round(dy / dx);
-
-            var tiles_hit: std.ArrayList(TileData) = .empty;
-            defer tiles_hit.deinit(self.alloc);
-
-            const start_tile = self.determineTile(start.x, start.y, sign_x, sign_y);
-            tiles_hit.append(self.alloc, start_tile) catch unreachable;
-
-            const end_tile = self.determineTile(end.x, end.y, sign_x, sign_y);
-
-            var current_loc: Vector = start;
-
-            for (0..max_iterations) |_| {
-                const dist_to_tile: Vector = .{
-                    .x = blk: {
-                        if (sign_x == 1) {
-                            break :blk tile_size - round(@mod(current_loc.x, tile_size));
-                        } else {
-                            const res = -1 * round(@mod(current_loc.x, tile_size));
-                            if (res == 0) break :blk -16.0;
-                            break :blk res;
-                        }
-                    },
-                    .y = blk: {
-                        if (sign_y == 1) {
-                            break :blk tile_size - round(@mod(current_loc.y, tile_size));
-                        } else {
-                            const res = -1 * round(@mod(current_loc.y, tile_size));
-                            if (res == 0) break :blk -16.0;
-                            break :blk res;
-                        }
-                    },
+            pub fn init(map: *Self, start: Vector, end: Vector) RaycastIterator {
+                const dx = end.x - start.x;
+                const dy = end.y - start.y;
+                const sign_x: isize = @intFromFloat(std.math.sign(dx));
+                const sign_y: isize = @intFromFloat(std.math.sign(dy));
+                const slope = if (dx == 0) std.math.inf(f32) else dy / dx;
+                return .{
+                    .map = map,
+                    .start = start,
+                    .end = end,
+                    .dx = dx,
+                    .dy = dy,
+                    .sign_x = sign_x,
+                    .sign_y = sign_y,
+                    .slope = slope,
+                    .current_loc = start,
+                    .next_tile = determineTile(map, start),
                 };
-
-                if (@abs(dist_to_tile.x * slope) < @abs(dist_to_tile.y)) {
-                    current_loc.x += dist_to_tile.x;
-                    current_loc.y += round(dist_to_tile.x * slope);
-                } else {
-                    current_loc.x += round(dist_to_tile.y / slope);
-                    current_loc.y += dist_to_tile.y;
-                }
-
-                const found = self.determineTile(current_loc.x, current_loc.y, sign_x, sign_y);
-                const current = self.getTileData(found.x, found.y);
-                tiles_hit.append(self.alloc, current) catch unreachable;
-
-                if (current.x == end_tile.x and current.y == end_tile.y) break;
             }
-            return tiles_hit.toOwnedSlice(self.alloc) catch unreachable;
-        }
+
+            fn getTileData(iter: *RaycastIterator, x: usize, y: usize) TileData {
+                return .{ .x = x, .y = y, .tile = iter.map.tiles.get(x, y) };
+            }
+
+            fn dispToTile(tile_coord: usize, loc: f32, sign: isize) f32 {
+                if (sign > 0) return tile_size + @as(f32, @floatFromInt(tile_coord)) * tile_size - loc;
+                return @as(f32, @floatFromInt(tile_coord)) * tile_size - loc;
+            }
+
+            fn determineTile(map: *Self, current_loc: Vector) TileData {
+                const tile_x = @as(usize, @intFromFloat(@floor(current_loc.x / tile_size)));
+                const tile_y = @as(usize, @intFromFloat(@floor(current_loc.y / tile_size)));
+                return .{ .x = tile_x, .y = tile_y, .tile = map.tiles.get(tile_x, tile_y) };
+            }
+
+            pub fn next(iter: *RaycastIterator) ?TileData {
+                const return_tile = iter.next_tile;
+                if (return_tile) |rt| {
+                    const disp_x = dispToTile(rt.x, iter.current_loc.x, iter.sign_x);
+                    const disp_y = dispToTile(rt.y, iter.current_loc.y, iter.sign_y);
+                    const slope_diff = @abs(disp_y) - @abs(disp_x * iter.slope);
+                    if (slope_diff > 0) {
+                        iter.current_loc.x += disp_x;
+                        iter.current_loc.y += disp_x * iter.slope;
+                        const new_x = @as(isize, @intCast(rt.x)) + iter.sign_x;
+                        if (new_x < 0 or new_x >= width) {
+                            iter.next_tile = null;
+                        } else {
+                            iter.next_tile = iter.getTileData(@as(usize, @intCast(new_x)), rt.y);
+                        }
+                    } else if (slope_diff < 0) {
+                        iter.current_loc.x += disp_y / iter.slope;
+                        iter.current_loc.y += disp_y;
+                        const new_y = @as(isize, @intCast(rt.y)) + iter.sign_y;
+                        if (new_y < 0 or new_y >= height) {
+                            iter.next_tile = null;
+                        } else {
+                            iter.next_tile = iter.getTileData(rt.x, @as(usize, @intCast(new_y)));
+                        }
+                    } else {
+                        // Going through intersection x and y at the same time
+                        iter.current_loc.x += disp_x;
+                        iter.current_loc.y += disp_y;
+                        const new_x = @as(isize, @intCast(rt.x)) + iter.sign_x;
+                        const new_y = @as(isize, @intCast(rt.y)) + iter.sign_y;
+                        if (new_x < 0 or new_x >= width or new_y < 0 or new_y >= height) {
+                            iter.next_tile = null;
+                        } else {
+                            iter.next_tile = iter.getTileData(
+                                @as(usize, @intCast(new_x)),
+                                @as(usize, @intCast(new_y)),
+                            );
+                        }
+                    }
+
+                    if (@abs(iter.current_loc.x - iter.start.x) >= @abs(iter.dx)) {
+                        iter.next_tile = null;
+                    }
+                }
+                return return_tile;
+            }
+        };
     };
 }

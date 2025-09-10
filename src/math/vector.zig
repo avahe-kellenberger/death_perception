@@ -92,6 +92,10 @@ pub fn Vector(T: type) type {
         pub fn perp(self: Self) Self {
             return .init(-self.y, self.x);
         }
+
+        pub fn round(self: Self) Self {
+            return .init(@round(self.x), @round(self.y));
+        }
     };
 }
 

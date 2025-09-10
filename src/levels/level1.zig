@@ -20,7 +20,7 @@ const CollisionShape = @import("../math/collisionshape.zig").CollisionShape;
 
 const TileData = @import("../map.zig").TileData;
 
-const Map = @import("../map.zig").Map(144, 144, 16.0);
+const Map = @import("../map.zig").Map(144, 144, Game.tile_size);
 
 pub const Level1 = struct {
     pub const Self = @This();
@@ -36,7 +36,6 @@ pub const Level1 = struct {
     // NOTE: Testing code below, can remove later
     raycast_start_loc: ?Vector = null,
     raycast_end_loc: ?Vector = null,
-    raycast_tiles: ?[]TileData = null,
 
     pub fn init(alloc: Allocator) Level1 {
         // Map floor color so we can ignore drawing "empty" tiles
@@ -49,8 +48,8 @@ pub const Level1 = struct {
         const wall_sheet = Spritesheet.init(alloc, wall_tiles_image, 3, 5);
 
         var player = Player.init();
-        player.loc.x = 16 * 70;
-        player.loc.y = 16 * 70;
+        player.loc.x = Map.tile_size * 70;
+        player.loc.y = Map.tile_size * 70;
 
         return .{
             .alloc = alloc,
@@ -106,60 +105,45 @@ pub const Level1 = struct {
         }
 
         Game.camera.centerOnPoint(self.player.loc);
+
+        if (Input.getButtonState(.left) == .just_pressed) {
+            self.raycast_start_loc = Game.camera.screenToWorld(Input.mouse.loc).round();
+        } else if (Input.getButtonState(.right) == .just_pressed) {
+            self.raycast_end_loc = Game.camera.screenToWorld(Input.mouse.loc).round();
+        }
     }
 
     pub fn render(self: *Self) void {
         self.map.render();
 
-        if (Input.getButtonState(.left) == .just_pressed) {
-            self.raycast_start_loc = Game.camera.screenToWorld(Input.mouse.loc);
-            if (self.raycast_tiles) |t| {
-                self.alloc.free(t);
-                self.raycast_tiles = null;
+        if (self.raycast_start_loc) |start| if (self.raycast_end_loc) |end| {
+            var iter = self.map.raycast(start, end);
+            while (iter.next()) |t| {
+                const rect: FRect = .{
+                    .x = @as(f32, @floatFromInt(t.x)) * Map.tile_size,
+                    .y = @as(f32, @floatFromInt(t.y)) * Map.tile_size,
+                    .w = Map.tile_size,
+                    .h = Map.tile_size,
+                };
+                Game.fillRect(rect, Color.blue.into());
             }
-        } else if (self.raycast_start_loc) |start| if (Input.getButtonState(.right) == .just_pressed) {
-            const end = Game.camera.screenToWorld(Input.mouse.loc);
-            self.raycast_end_loc = end;
-
-            if (self.raycast_tiles) |t| {
-                self.alloc.free(t);
-                self.raycast_tiles = null;
-            }
-
-            self.raycast_tiles = self.map.raycast(start, end);
-            std.log.err("Raycast found {} tiles", .{self.raycast_tiles.?.len});
-        };
-
-        // NOTE: Allows for transparency (should this just be our default?)
-        Game.setBlendMode(.blend);
-
-        if (self.raycast_start_loc) |start| {
-            Game.fillRect(.{ .x = start.x - 1, .y = start.y - 1, .w = 2, .h = 2 }, Color.red.into());
-        }
-
-        if (self.raycast_end_loc) |end| {
-            Game.fillRect(.{ .x = end.x - 1, .y = end.y - 1, .w = 2, .h = 2 }, Color.red.into());
-        }
-
-        if (self.raycast_tiles) |tiles| for (tiles) |t| {
-            const rect: FRect = .{
-                .x = @as(f32, @floatFromInt(t.x)) * 16.0,
-                .y = @as(f32, @floatFromInt(t.y)) * 16.0,
-                .w = Map.tile_size,
-                .h = Map.tile_size,
-            };
-            Game.fillRect(rect, Color.blue.into());
         };
 
         if (self.raycast_start_loc) |start| if (self.raycast_end_loc) |end| {
-            Game.renderer.setDrawColor(Color.red.into()) catch unreachable;
+            Game.renderer.setDrawColor(Color.black.into()) catch unreachable;
             Game.renderer.renderLine(
                 .{ .x = start.x - Game.camera.viewport.x, .y = start.y - Game.camera.viewport.y },
                 .{ .x = end.x - Game.camera.viewport.x, .y = end.y - Game.camera.viewport.y },
             ) catch unreachable;
         };
 
-        Game.resetBlendMode();
+        if (self.raycast_start_loc) |start| {
+            Game.fillRect(.{ .x = start.x, .y = start.y, .w = 1, .h = 1 }, Color.green.into());
+        }
+
+        if (self.raycast_end_loc) |end| {
+            Game.fillRect(.{ .x = end.x, .y = end.y, .w = 1, .h = 1 }, Color.red.into());
+        }
 
         self.player.render();
     }

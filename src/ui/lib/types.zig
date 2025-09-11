@@ -3,13 +3,13 @@ const sdl = @import("sdl3");
 
 const Vector = @import("../../math/vector.zig").Vector(f32);
 
-pub const StackDirection = enum {
+pub const StackDirection = enum(u2) {
     vertical,
     horizontal,
     overlap,
 };
 
-pub const SizeKind = enum {
+pub const SizeKind = enum(u1) {
     pixel,
     ratio,
 };
@@ -67,6 +67,10 @@ pub const Insets = struct {
             (self.left + self.right) / 2.0,
             (self.top + self.bottom) / 2.0,
         );
+    }
+
+    pub fn contains(self: *const Self, x: f32, y: f32) bool {
+        return x >= self.left and y >= self.top and x < self.right and y < self.bottom;
     }
 
     pub fn intersect(self: *const Self, other: *const Self) Self {

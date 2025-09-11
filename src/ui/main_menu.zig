@@ -3,6 +3,8 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+const sdl = @import("sdl3");
+
 const ui = @import("./lib/component.zig");
 const UIComponent = ui.Component;
 
@@ -205,6 +207,12 @@ pub fn deinit() void {
     if (root) |*r| {
         r.deinit();
         root = null;
+    }
+}
+
+pub fn input(event: sdl.events.Event) void {
+    if (root) |*r| {
+        r.handleInputEvent(event);
     }
 }
 

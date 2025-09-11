@@ -48,6 +48,15 @@ pub fn deinit() void {
     MainMenu.deinit();
 }
 
+pub fn input(event: sdl.events.Event) void {
+    switch (state) {
+        .main_menu => MainMenu.input(event),
+        else => {
+            // Others
+        },
+    }
+}
+
 pub fn update(frame_delay: f32) void {
     if (Input.isKeyPressed(.m)) {
         state = .main_menu;

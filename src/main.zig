@@ -82,7 +82,10 @@ pub fn main() !void {
         while (sdl.events.poll()) |event| {
             switch (event) {
                 .key_up, .key_down => try Input.update(event),
-                .mouse_motion, .mouse_button_up, .mouse_button_down => try Input.update(event),
+                .mouse_motion, .mouse_button_up, .mouse_button_down => {
+                    try Input.update(event);
+                    Game.input(event);
+                },
                 .quit, .terminating => running = false,
                 .window_pixel_size_changed => |e| {
                     Game.camera.setSize(@floatFromInt(e.width), @floatFromInt(e.height));

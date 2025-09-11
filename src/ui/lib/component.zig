@@ -16,6 +16,17 @@ const Size = types.Size;
 pub const ComponentID = u32;
 const ChildrenMap = std.array_hash_map.AutoArrayHashMapUnmanaged(ComponentID, Component);
 
+pub fn EventSpec(comptime Event: type) type {
+    return _EventSpec(Event, *anyopaque);
+}
+
+fn _EventSpec(comptime Event: type, comptime Context: type) type {
+    return struct {
+        handler: *const fn (comp: *Component, event: Event, ctx: Context) void,
+        context: Context,
+    };
+}
+
 pub const DisplayMode = enum(u2) {
     // The component should be included in layout and rendered.
     visible,
@@ -70,6 +81,12 @@ pub const Component = struct {
     background_color: Color = .transparent,
     border_color: Color = .black,
     content: ComponentContent = .none,
+
+    // Event handlers
+    on_mouse_button: ?EventSpec(sdl.events.MouseButton) = null,
+    on_mouse_motion: ?EventSpec(sdl.events.MouseMotion) = null,
+    on_mouse_enter: ?EventSpec(sdl.events.MouseMotion) = null,
+    on_mouse_exit: ?EventSpec(sdl.events.MouseMotion) = null,
 
     pub fn init(alloc: Allocator) Self {
         defer next_id += 1;
@@ -314,46 +331,31 @@ pub const Component = struct {
         }
     }
 
+    pub fn enableInput(self: *Self) void {
+        self._layout.input = true;
+    }
+
     /// Find the deepest component at the given point that can accept input events.
-    pub fn findDeepestComponentContainingPoint(self: *Self, x: f32, y: f32) ?*Self {
+    fn findDeepestComponentContainingPoint(self: *Self, x: f32, y: f32) ?*Self {
         // Check conditions that affect child components too
         if (self._layout.mode == .visible and self._bounds.contains(x, y)) {
-            for (self._children.values()) |*child| {
+            // Must iterate children backwards because when children are rendered in overlap stack direction,
+            // the last child shows on top and should be the first one to receive input events.
+            const children = self._children.values();
+            var i: usize = children.len;
+            while (i > 0) {
+                i -= 1;
+                const child: *Component = &children[i];
                 if (child.findDeepestComponentContainingPoint(x, y)) |deep| {
                     return deep;
                 }
             }
+            // If no child component produces a hit, try the current component
             if (self._layout.input) {
                 return self;
             }
         }
         return null;
-    }
-
-    pub fn handleInputEvent(self: *Self, event: sdl.events.Event) void {
-        switch (event) {
-            .mouse_motion => |mme| {
-                self.handleMouseMotion(mme);
-            },
-            .mouse_button_down, .mouse_button_up => |mbe| {
-                self.handleMouseButton(mbe);
-            },
-            else => {},
-        }
-    }
-
-    fn handleMouseButton(self: *Self, mouse_button: sdl.events.MouseButton) void {
-        if (self.findDeepestComponentContainingPoint(mouse_button.x, mouse_button.y)) |comp| {
-            // TODO run events
-            _ = comp;
-        }
-    }
-
-    fn handleMouseMotion(self: *Self, mouse_motion: sdl.events.MouseMotion) void {
-        if (self.findDeepestComponentContainingPoint(mouse_motion.x, mouse_motion.y)) |comp| {
-            // TODO run events
-            _ = comp;
-        }
     }
 
     pub fn render(self: *const Self, parent_bounds: Insets) void {
@@ -402,6 +404,62 @@ pub const Component = struct {
         }
     }
 };
+
+/// Keeps track of the deepest hovered component.
+/// This is used to calculate and generated enter and exit events.
+var hovered_component: ?*Component = null;
+
+pub fn handleInputEvent(root: *Component, event: sdl.events.Event) void {
+    switch (event) {
+        .mouse_motion => |mme| {
+            handleMouseMotion(root, mme);
+        },
+        .mouse_button_down, .mouse_button_up => |mbe| {
+            handleMouseButton(root, mbe);
+        },
+        else => {},
+    }
+}
+
+fn handleMouseButton(root: *Component, mouse_button: sdl.events.MouseButton) void {
+    if (root.findDeepestComponentContainingPoint(mouse_button.x, mouse_button.y)) |comp| {
+        if (comp.on_mouse_button) |spec| {
+            spec.handler(comp, mouse_button, spec.context);
+        }
+    }
+}
+
+fn handleMouseMotion(root: *Component, mouse_motion: sdl.events.MouseMotion) void {
+    if (root.findDeepestComponentContainingPoint(mouse_motion.x, mouse_motion.y)) |comp| {
+        if (comp.on_mouse_motion) |spec| {
+            spec.handler(comp, mouse_motion, spec.context);
+        }
+        if (hovered_component) |hc| {
+            if (hc != comp) {
+                handleMouseExit(hc, mouse_motion);
+                handleMouseEnter(comp, mouse_motion);
+            }
+        } else {
+            handleMouseEnter(comp, mouse_motion);
+        }
+    } else if (hovered_component) |hc| {
+        handleMouseExit(hc, mouse_motion);
+    }
+}
+
+fn handleMouseEnter(comp: *Component, event: sdl.events.MouseMotion) void {
+    hovered_component = comp;
+    if (comp.on_mouse_enter) |spec| {
+        spec.handler(comp, event, spec.context);
+    }
+}
+
+fn handleMouseExit(comp: *Component, event: sdl.events.MouseMotion) void {
+    hovered_component = null;
+    if (comp.on_mouse_exit) |spec| {
+        spec.handler(comp, event, spec.context);
+    }
+}
 
 /// Render a root component to the screen
 pub fn render(root: *Component, width: f32, height: f32) void {

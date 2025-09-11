@@ -94,6 +94,23 @@ pub fn init(alloc: Allocator) void {
             .fit = fit,
         },
     };
+    center_center.enableInput();
+    center_center.on_mouse_enter = .{
+        .context = undefined,
+        .handler = struct {
+            fn handler(comp: *UIComponent, _: sdl.events.MouseMotion, _: *anyopaque) void {
+                comp.background_color = .{ .b = 255 };
+            }
+        }.handler,
+    };
+    center_center.on_mouse_exit = .{
+        .context = undefined,
+        .handler = struct {
+            fn handler(comp: *UIComponent, _: sdl.events.MouseMotion, _: *anyopaque) void {
+                comp.background_color = .{ .r = 255 };
+            }
+        }.handler,
+    };
 
     var center_right = UIComponent.init(alloc);
     center_right.setWidth(200);
@@ -212,7 +229,7 @@ pub fn deinit() void {
 
 pub fn input(event: sdl.events.Event) void {
     if (root) |*r| {
-        r.handleInputEvent(event);
+        ui.handleInputEvent(r, event);
     }
 }
 

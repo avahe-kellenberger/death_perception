@@ -65,8 +65,6 @@ const Font = struct {
     size: f32 = 64.0,
 };
 
-const Image = sdl.render.Texture;
-
 pub const ComponentText = struct {
     const Self = @This();
 
@@ -77,7 +75,11 @@ pub const ComponentText = struct {
     font: Font = .{},
     color: Color = .black,
 
-    _image: ?Image = null,
+    _image: ?sdl.render.Texture = null,
+
+    pub fn init(self: *Self) void {
+        _ = self.ensureImage();
+    }
 
     pub fn deinit(self: *Self) void {
         self.content.deinit();
@@ -91,7 +93,7 @@ pub const ComponentText = struct {
         }
     }
 
-    fn ensureImage(self: *const Self) ?Image {
+    fn ensureImage(self: *const Self) ?sdl.render.Texture {
         const text = self.content.ref();
         if (text.len == 0) {
             @constCast(self).clearImage();

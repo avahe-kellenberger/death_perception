@@ -119,7 +119,7 @@ pub fn collides(
         const is_a = i < num_axes_a;
         // Find the projection of each shape on the current axis
         const proj_a = shape_a.project(relative_loc, axis);
-        const proj_b = shape_b.project(Vector.Zero, axis);
+        const proj_b = shape_b.project(Vector.zero, axis);
 
         // Project the velocity on the current axis.
         const move_vector_proj = relative_move_vector.dotProduct(axis);

@@ -62,6 +62,10 @@ pub const Insets = struct {
         return self.bottom - self.top;
     }
 
+    pub fn size(self: *const Self) Vector {
+        return .init(self.width(), self.height());
+    }
+
     pub fn center(self: *const Self) Vector {
         return .init(
             (self.left + self.right) / 2.0,

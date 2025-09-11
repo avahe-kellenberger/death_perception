@@ -94,7 +94,7 @@ pub const Level1 = struct {
                 player_loc.subtract(start_loc),
                 tile_loc,
                 tile_shape,
-                Vector.Zero,
+                Vector.zero,
             )) |result| {
                 if (result.collision_owner_a) {
                     self.player.loc = player_loc.add(result.invert().getMinTranslationVector().scale(0.5));

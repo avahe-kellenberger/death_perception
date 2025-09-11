@@ -7,9 +7,14 @@ const expectApproxEqAbs = std.testing.expectApproxEqAbs;
 pub fn Vector(T: type) type {
     return struct {
         pub const Self = @This();
-        pub const Zero = blk: switch (@typeInfo(T)) {
-            .float => break :blk vector(0, 0),
-            .int => break :blk ivector(0, 0),
+        pub const zero = switch (@typeInfo(T)) {
+            .float => vector(0, 0),
+            .int => ivector(0, 0),
+            else => unreachable,
+        };
+        pub const one = switch (@typeInfo(T)) {
+            .float => vector(1.0, 1.0),
+            .int => ivector(1, 1),
             else => unreachable,
         };
 
@@ -26,6 +31,14 @@ pub fn Vector(T: type) type {
 
         pub fn subtract(self: Self, other: Self) Self {
             return .{ .x = self.x - other.x, .y = self.y - other.y };
+        }
+
+        pub fn mul(self: Self, other: Self) Self {
+            return .{ .x = self.x * other.x, .y = self.y * other.y };
+        }
+
+        pub fn div(self: Self, other: Self) Self {
+            return .{ .x = self.x / other.x, .y = self.y / other.y };
         }
 
         pub fn scale(self: Self, scalar: f32) Self {
@@ -59,21 +72,11 @@ pub fn Vector(T: type) type {
         }
 
         pub fn distanceSquared(self: Self, other: Self) f32 {
-            const result = pow(T, self.x - other.x, 2) + pow(T, self.y - other.y, 2);
-            switch (@typeInfo(T)) {
-                .float => return result,
-                .int => return @floatFromInt(result),
-                else => unreachable,
-            }
-
-            return @floatFromInt(
-                pow(T, self.x - other.x, 2) +
-                    pow(T, self.y - other.y, 2),
-            );
+            return other.subtract(self).getMagnitudeSquared();
         }
 
         pub fn distance(self: Self, other: Self) f32 {
-            return @sqrt(self.distanceSquared(other));
+            return other.subtract(self).getMagnitude();
         }
 
         pub fn dotProduct(self: Self, other: Self) f32 {

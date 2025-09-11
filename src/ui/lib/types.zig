@@ -1,13 +1,15 @@
 const std = @import("std");
 const sdl = @import("sdl3");
 
-pub const StackDirection = enum {
+const Vector = @import("../../math/vector.zig").Vector(f32);
+
+pub const StackDirection = enum(u2) {
     vertical,
     horizontal,
     overlap,
 };
 
-pub const SizeKind = enum {
+pub const SizeKind = enum(u1) {
     pixel,
     ratio,
 };
@@ -58,6 +60,21 @@ pub const Insets = struct {
 
     pub fn height(self: *const Self) f32 {
         return self.bottom - self.top;
+    }
+
+    pub fn size(self: *const Self) Vector {
+        return .init(self.width(), self.height());
+    }
+
+    pub fn center(self: *const Self) Vector {
+        return .init(
+            (self.left + self.right) / 2.0,
+            (self.top + self.bottom) / 2.0,
+        );
+    }
+
+    pub fn contains(self: *const Self, x: f32, y: f32) bool {
+        return x >= self.left and y >= self.top and x < self.right and y < self.bottom;
     }
 
     pub fn intersect(self: *const Self, other: *const Self) Self {

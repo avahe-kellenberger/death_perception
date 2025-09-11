@@ -94,7 +94,7 @@ pub const Level1 = struct {
                 player_loc.subtract(start_loc),
                 tile_loc,
                 tile_shape,
-                Vector.Zero,
+                Vector.zero,
             )) |result| {
                 if (result.collision_owner_a) {
                     self.player.loc = player_loc.add(result.invert().getMinTranslationVector().scale(0.5));
@@ -125,12 +125,12 @@ pub const Level1 = struct {
                     .w = Map.tile_size,
                     .h = Map.tile_size,
                 };
-                Game.fillRect(rect, Color.blue.into());
+                Game.fillRect(rect, Color.blue.sdl());
             }
         };
 
         if (self.raycast_start_loc) |start| if (self.raycast_end_loc) |end| {
-            Game.renderer.setDrawColor(Color.black.into()) catch unreachable;
+            Game.renderer.setDrawColor(Color.black.sdl()) catch unreachable;
             Game.renderer.renderLine(
                 .{ .x = start.x - Game.camera.viewport.x, .y = start.y - Game.camera.viewport.y },
                 .{ .x = end.x - Game.camera.viewport.x, .y = end.y - Game.camera.viewport.y },
@@ -138,11 +138,11 @@ pub const Level1 = struct {
         };
 
         if (self.raycast_start_loc) |start| {
-            Game.fillRect(.{ .x = start.x, .y = start.y, .w = 1, .h = 1 }, Color.green.into());
+            Game.fillRect(.{ .x = start.x, .y = start.y, .w = 1, .h = 1 }, Color.green.sdl());
         }
 
         if (self.raycast_end_loc) |end| {
-            Game.fillRect(.{ .x = end.x, .y = end.y, .w = 1, .h = 1 }, Color.red.into());
+            Game.fillRect(.{ .x = end.x, .y = end.y, .w = 1, .h = 1 }, Color.red.sdl());
         }
 
         self.player.render();

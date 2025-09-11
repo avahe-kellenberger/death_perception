@@ -1,6 +1,8 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+const sdl = @import("sdl3");
+
 const Game = @import("../../game.zig");
 const Color = @import("../../color.zig").Color;
 const Alignment = @import("./alignment.zig").Alignment;
@@ -14,7 +16,27 @@ const Size = types.Size;
 pub const ComponentID = u32;
 const ChildrenMap = std.array_hash_map.AutoArrayHashMapUnmanaged(ComponentID, Component);
 
-const ValidationStatus = enum {
+pub fn EventSpec(comptime Event: type) type {
+    return _EventSpec(Event, *anyopaque);
+}
+
+fn _EventSpec(comptime Event: type, comptime Context: type) type {
+    return struct {
+        handler: *const fn (comp: *Component, event: Event, ctx: Context) void,
+        context: Context,
+    };
+}
+
+pub const DisplayMode = enum(u2) {
+    // The component should be included in layout and rendered.
+    visible,
+    // The component should be included in layout, but not rendered.
+    invisible,
+    // The component shouldn't be included in layout nor rendered.
+    disabled,
+};
+
+const ValidationStatus = enum(u2) {
     valid,
     invalid,
     invalid_child,
@@ -32,8 +54,6 @@ pub const Component = struct {
     // Top-down design: child components cannot cause their parent components to resize.
     _parent: ?*Component = null,
     _children: ChildrenMap = .empty,
-    _visible: bool = true,
-    _enabled: bool = true,
 
     // If width or height are == 0, fill out all space available in layout.
     _width: Size = .{ .pixel = 0 },
@@ -41,16 +61,32 @@ pub const Component = struct {
     _margin: Insets = .zero,
     _padding: Insets = .zero,
     _border_width: f32 = 0.0,
-    _align_h: Alignment = .start,
-    _align_v: Alignment = .start,
-    _stack_direction: StackDirection = .vertical,
-    _layout_status: ValidationStatus = .invalid,
+    _layout: packed struct {
+        /// The display mode of the component.
+        mode: DisplayMode = .visible,
+        /// How child components should be aligned along the horizontal axis.
+        align_h: Alignment = .start,
+        /// How child components should be aligned along the vertical axis.
+        align_v: Alignment = .start,
+        /// The main axis of the child component layout.
+        stack_direction: StackDirection = .vertical,
+        /// The validation status of the component layout.
+        status: ValidationStatus = .invalid,
+        // Whether the component accepts input events.
+        input: bool = false,
+    } = .{},
     _bounds: Insets = .zero, // Bounds including padding, excluding margin.
 
     // These fields can be set directly without impacting layout.
     background_color: Color = .transparent,
     border_color: Color = .black,
     content: ComponentContent = .none,
+
+    // Event handlers
+    on_mouse_button: ?EventSpec(sdl.events.MouseButton) = null,
+    on_mouse_motion: ?EventSpec(sdl.events.MouseMotion) = null,
+    on_mouse_enter: ?EventSpec(sdl.events.MouseMotion) = null,
+    on_mouse_exit: ?EventSpec(sdl.events.MouseMotion) = null,
 
     pub fn init(alloc: Allocator) Self {
         defer next_id += 1;
@@ -98,47 +134,40 @@ pub const Component = struct {
     }
 
     pub fn setLayoutStatus(self: *Self, new_layout_status: ValidationStatus) void {
-        self._layout_status = new_layout_status;
+        self._layout.status = new_layout_status;
         if (new_layout_status != .valid) {
             if (self._parent) |p| {
-                if (p._layout_status == .valid) {
+                if (p._layout.status == .valid) {
                     p.setLayoutStatus(.invalid_child);
                 }
             }
         }
     }
 
-    pub fn setVisible(self: *Self, visible: bool) void {
-        if (self._visible != visible) {
-            self._visible = visible;
-            self.setLayoutStatus(.invalid);
-        }
-    }
-
-    pub fn setEnabled(self: *Self, enabled: bool) void {
-        if (self._enabled != enabled) {
-            self._enabled = enabled;
+    pub fn setDisplayMode(self: *Self, mode: DisplayMode) void {
+        if (self._layout.mode != mode) {
+            self._layout.mode = mode;
             self.setLayoutStatus(.invalid);
         }
     }
 
     pub fn setStackDirection(self: *Self, direction: StackDirection) void {
-        if (self._stack_direction != direction) {
-            self._stack_direction = direction;
+        if (self._layout.stack_direction != direction) {
+            self._layout.stack_direction = direction;
             self.setLayoutStatus(.invalid);
         }
     }
 
     pub fn setHorizontalAlignment(self: *Self, alignment: Alignment) void {
-        if (self._align_h != alignment) {
-            self._align_h = alignment;
+        if (self._layout.align_h != alignment) {
+            self._layout.align_h = alignment;
             self.setLayoutStatus(.invalid);
         }
     }
 
     pub fn setVerticalAlignment(self: *Self, alignment: Alignment) void {
-        if (self._align_v != alignment) {
-            self._align_v = alignment;
+        if (self._layout.align_v != alignment) {
+            self._layout.align_v = alignment;
             self.setLayoutStatus(.invalid);
         }
     }
@@ -278,7 +307,7 @@ pub const Component = struct {
     }
 
     fn validateLayout(self: *Self) void {
-        if (self._layout_status == .valid) return;
+        if (self._layout.status == .valid) return;
 
         // Updates this component's bounds, and all children (deep).
         self._bounds.left = 0;
@@ -292,8 +321,8 @@ pub const Component = struct {
 
     fn updateChildrenBounds(self: *Self) void {
         if (self._children.count() == 0) return;
-        self._align_v.process(self, .vertical);
-        self._align_h.process(self, .horizontal);
+        self._layout.align_v.process(self, .vertical);
+        self._layout.align_h.process(self, .horizontal);
         for (self._children.values()) |*c| {
             c.setLayoutStatus(.valid);
         }
@@ -302,8 +331,35 @@ pub const Component = struct {
         }
     }
 
+    pub fn enableInput(self: *Self) void {
+        self._layout.input = true;
+    }
+
+    /// Find the deepest component at the given point that can accept input events.
+    fn findDeepestComponentContainingPoint(self: *Self, x: f32, y: f32) ?*Self {
+        // Check conditions that affect child components too
+        if (self._layout.mode == .visible and self._bounds.contains(x, y)) {
+            // Must iterate children backwards because when children are rendered in overlap stack direction,
+            // the last child shows on top and should be the first one to receive input events.
+            const children = self._children.values();
+            var i: usize = children.len;
+            while (i > 0) {
+                i -= 1;
+                const child: *Component = &children[i];
+                if (child.findDeepestComponentContainingPoint(x, y)) |deep| {
+                    return deep;
+                }
+            }
+            // If no child component produces a hit, try the current component
+            if (self._layout.input) {
+                return self;
+            }
+        }
+        return null;
+    }
+
     pub fn render(self: *const Self, parent_bounds: Insets) void {
-        if (!self._visible) return;
+        if (self._layout.mode != .visible) return;
 
         if (self._bounds.left >= parent_bounds.right or
             self._bounds.top >= parent_bounds.bottom or
@@ -320,7 +376,7 @@ pub const Component = struct {
         defer Game.renderer.setClipRect(null) catch unreachable;
 
         if (self.background_color.a != 0) {
-            Game.renderer.setDrawColor(self.background_color.into()) catch unreachable;
+            Game.renderer.setDrawColor(self.background_color.sdl()) catch unreachable;
             Game.renderer.renderFillRect(self._bounds.frect()) catch unreachable;
         }
 
@@ -348,6 +404,62 @@ pub const Component = struct {
         }
     }
 };
+
+/// Keeps track of the deepest hovered component.
+/// This is used to calculate and generated enter and exit events.
+var hovered_component: ?*Component = null;
+
+pub fn handleInputEvent(root: *Component, event: sdl.events.Event) void {
+    switch (event) {
+        .mouse_motion => |mme| {
+            handleMouseMotion(root, mme);
+        },
+        .mouse_button_down, .mouse_button_up => |mbe| {
+            handleMouseButton(root, mbe);
+        },
+        else => {},
+    }
+}
+
+fn handleMouseButton(root: *Component, mouse_button: sdl.events.MouseButton) void {
+    if (root.findDeepestComponentContainingPoint(mouse_button.x, mouse_button.y)) |comp| {
+        if (comp.on_mouse_button) |spec| {
+            spec.handler(comp, mouse_button, spec.context);
+        }
+    }
+}
+
+fn handleMouseMotion(root: *Component, mouse_motion: sdl.events.MouseMotion) void {
+    if (root.findDeepestComponentContainingPoint(mouse_motion.x, mouse_motion.y)) |comp| {
+        if (comp.on_mouse_motion) |spec| {
+            spec.handler(comp, mouse_motion, spec.context);
+        }
+        if (hovered_component) |hc| {
+            if (hc != comp) {
+                handleMouseExit(hc, mouse_motion);
+                handleMouseEnter(comp, mouse_motion);
+            }
+        } else {
+            handleMouseEnter(comp, mouse_motion);
+        }
+    } else if (hovered_component) |hc| {
+        handleMouseExit(hc, mouse_motion);
+    }
+}
+
+fn handleMouseEnter(comp: *Component, event: sdl.events.MouseMotion) void {
+    hovered_component = comp;
+    if (comp.on_mouse_enter) |spec| {
+        spec.handler(comp, event, spec.context);
+    }
+}
+
+fn handleMouseExit(comp: *Component, event: sdl.events.MouseMotion) void {
+    hovered_component = null;
+    if (comp.on_mouse_exit) |spec| {
+        spec.handler(comp, event, spec.context);
+    }
+}
 
 /// Render a root component to the screen
 pub fn render(root: *Component, width: f32, height: f32) void {

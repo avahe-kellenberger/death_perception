@@ -98,7 +98,7 @@ pub const ComponentImage = struct {
             .center => content_area.center().x - (target_size.x / 2.0),
             .end => content_area.right - target_size.x,
         };
-        const y_top: f32 = switch (self.align_h) {
+        const y_top: f32 = switch (self.align_v) {
             .start => content_area.top,
             .center => content_area.center().y - (target_size.y / 2.0),
             .end => content_area.bottom - target_size.y,

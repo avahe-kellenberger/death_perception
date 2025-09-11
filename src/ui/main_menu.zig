@@ -81,17 +81,19 @@ pub fn init(alloc: Allocator) void {
 
     var center_center = UIComponent.init(alloc);
     center_center.setMarginInsets(.{ .right = 50 });
+    center_center.setPadding(10);
     center_center.setWidth(200);
     center_center.setHeight(200);
     center_center.background_color = .{
         .r = 255,
     };
     center_center.content = .{
-        .text = .{
-            .content = .borrow("Center"),
-            .align_h = .center,
+        .image = .{
+            .file_path = "./assets/images/player.png",
+            .align_h = .start,
             .align_v = .center,
-            .fit = fit,
+            .fit = .none,
+            .scale = 6.0,
         },
     };
     center_center.enableInput();

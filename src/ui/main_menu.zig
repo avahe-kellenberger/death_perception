@@ -77,17 +77,40 @@ pub fn init() void {
     menu.setMargin(100);
     menu.setWidth(250);
 
-    var start_button = createMenuButton("Start");
-    start_button.on_mouse_button = .{
+    var new_game_button = createMenuButton("New Game");
+    new_game_button.on_mouse_button = .{
         .context = undefined,
         .handler = struct {
             fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: *anyopaque) void {
                 // TODO should animate going into the door in the background
-                Game.state = .in_game;
+                Game.state = .lobby;
             }
         }.handler,
     };
-    menu.add(start_button);
+    menu.add(new_game_button);
+
+    var load_game_button = createMenuButton("Load Game");
+    load_game_button.on_mouse_button = .{
+        .context = undefined,
+        .handler = struct {
+            fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: *anyopaque) void {
+                // TODO should animate going into the door in the background
+            }
+        }.handler,
+    };
+    menu.add(load_game_button);
+
+    var join_game_button = createMenuButton("Join Game");
+    join_game_button.on_mouse_button = .{
+        .context = undefined,
+        .handler = struct {
+            fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: *anyopaque) void {
+                // TODO should animate going into the door in the background
+                Game.state = .join_game;
+            }
+        }.handler,
+    };
+    menu.add(join_game_button);
 
     var settings_button = createMenuButton("Settings");
     settings_button.on_mouse_button = .{

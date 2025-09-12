@@ -19,6 +19,7 @@ const Level1 = @import("./levels/level1.zig").Level1;
 pub const GameState = enum {
     main_menu,
     lobby,
+    load_game,
     join_game,
     settings,
     in_game,
@@ -82,6 +83,9 @@ pub fn update(frame_delay: f32) void {
         .lobby => {
             // TODO
         },
+        .load_game => {
+            // TODO
+        },
         .join_game => {
             // TODO
         },
@@ -117,6 +121,9 @@ pub fn render() void {
             MainMenu.render(camera.size.x, camera.size.y);
         },
         .lobby => {
+            // TODO
+        },
+        .load_game => {
             // TODO
         },
         .join_game => {

@@ -18,6 +18,7 @@ pub fn main() !void {
 
     const init_flags = sdl.InitFlags{
         .video = true,
+        .audio = true,
         .joystick = true,
         .gamepad = true,
     };

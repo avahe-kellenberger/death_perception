@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 
 const sdl = @import("sdl3");
 const Renderer = sdl.render.Renderer;
@@ -11,6 +12,13 @@ const Input = @import("input.zig");
 const Vector = @import("math/vector.zig").Vector(f32);
 const CollisionShape = @import("math/collisionshape.zig").CollisionShape;
 
+const animation = @import("animation/animation.zig");
+const Animation = animation.Animation;
+const Track = animation.Track;
+const Keyframe = animation.Keyframe;
+
+const AnimationPlayer = @import("animation/animation_player.zig").AnimationPlayer;
+
 const max_speed = 85.0 * Game.tile_size / 16.0;
 
 pub const Player = struct {
@@ -22,18 +30,41 @@ pub const Player = struct {
     loc: Vector = .init(0, 0),
     image_size: Vector = undefined,
     scale: Vector = .init(1, 1),
-    // animation
+    anim_player: AnimationPlayer,
+    render_offset: Vector = .init(0, 0),
 
-    pub fn init() Player {
+    pub fn init(alloc: Allocator) *Player {
         const image = Game.loadTexture("./assets/images/player.png", .nearest);
-        return .{
-            .image = image,
-            .image_size = .{ .x = Game.tile_size, .y = Game.tile_size },
-        };
+
+        var player: *Player = alloc.create(Player) catch unreachable;
+        player.image = image;
+        player.image_size = .{ .x = Game.tile_size, .y = Game.tile_size };
+        player.anim_player = .init(alloc);
+
+        // Create idle animation
+        {
+            var idle_anim: Animation = .init(alloc, 1.2);
+            idle_anim.addTrack(Vector, .init(
+                alloc,
+                &player.scale,
+                &.{
+                    .{ .value = .init(1, 1), .time = 0.0 },
+                    .{ .value = .init(1.1, 1.05), .time = 0.8 },
+                    .{ .value = .init(1, 1), .time = 1.2 },
+                },
+                .{ .wrap_interpolation = false },
+            ));
+            player.anim_player.addAnimation("idle", idle_anim);
+            player.anim_player.setAnimation("idle");
+            player.anim_player.looping = true;
+        }
+
+        return player;
     }
 
     pub fn deinit(self: *Self) void {
         self.image.deinit();
+        self.anim_player.deinit();
     }
 
     pub fn update(self: *Self, dt: f32) void {
@@ -48,14 +79,16 @@ pub const Player = struct {
 
         self.loc.x += vel.x * dt;
         self.loc.y += vel.y * dt;
+
+        self.anim_player.update(dt);
     }
 
     pub fn render(self: *Self) void {
         Game.renderTexture(self.image, null, .{
-            .x = self.loc.x - self.image_size.x * 0.5,
-            .y = self.loc.y - self.image_size.y * 0.5,
-            .w = self.image_size.x,
-            .h = self.image_size.y,
+            .x = self.loc.x - self.image_size.x * 0.5 * self.scale.x,
+            .y = self.loc.y - self.image_size.y * 0.5 * self.scale.y,
+            .w = self.image_size.x * self.scale.x,
+            .h = self.image_size.y * self.scale.y,
         });
     }
 };

@@ -8,8 +8,6 @@ pub fn Keyframe(T: type) type {
     return struct { value: T, time: f32 };
 }
 
-// pub const TrackKind = enum { i32, f32, bool, vector, ivector };
-
 pub fn TrackOpts(T: type) type {
     return struct {
         wrap_interpolation: bool = false,
@@ -21,18 +19,29 @@ pub fn Track(T: type) type {
     return struct {
         pub const Self = @This();
 
+        alloc: std.mem.Allocator,
         field: *T,
-        frames: []Keyframe(T),
+        frames: []const Keyframe(T),
         wrap_interpolation: bool,
         ease: *const easings.EasingFn(T) = easings.lerp(T),
 
-        pub fn init(field: *T, frames: []Keyframe(T), opts: TrackOpts(T)) Self {
+        pub fn init(
+            alloc: std.mem.Allocator,
+            field: *T,
+            frames: []const Keyframe(T),
+            opts: TrackOpts(T),
+        ) Self {
             return .{
+                .alloc = alloc,
                 .field = field,
-                .frames = frames,
+                .frames = alloc.dupe(Keyframe(T), frames) catch unreachable,
                 .wrap_interpolation = opts.wrap_interpolation,
                 .ease = opts.ease,
             };
+        }
+
+        pub fn deinit(self: *Self) void {
+            self.alloc.free(self.frames);
         }
     };
 }
@@ -42,7 +51,6 @@ pub const Animation = struct {
 
     alloc: std.mem.Allocator,
     duration: f32,
-    looping: bool,
 
     i32_tracks: ArrayList(Track(i32)) = .empty,
     f32_tracks: ArrayList(Track(f32)) = .empty,
@@ -50,12 +58,8 @@ pub const Animation = struct {
     vector_tracks: ArrayList(Track(Vector(f32))) = .empty,
     ivector_tracks: ArrayList(Track(Vector(i32))) = .empty,
 
-    pub fn init(alloc: std.mem.Allocator, duration: f32, looping: bool) Self {
-        return .{
-            .alloc = alloc,
-            .duration = duration,
-            .looping = looping,
-        };
+    pub fn init(alloc: std.mem.Allocator, duration: f32) Self {
+        return .{ .alloc = alloc, .duration = duration };
     }
 
     pub fn deinit(self: *Self) void {

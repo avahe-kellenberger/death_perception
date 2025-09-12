@@ -97,7 +97,7 @@ pub fn init() void {
 
     var lobby = UIComponent.init();
     lobby.setStackDirection(.vertical);
-    lobby.setMargin(100);
+    lobby.setMargin(100); // margin must be set for the bug to happen
     lobby.setWidth(250);
     lobby.background_color = .blue;
 

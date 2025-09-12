@@ -107,4 +107,7 @@ pub fn main() !void {
 test {
     // Required for `zig build test` to find all tests in src
     std.testing.refAllDecls(@This());
+    // TODO: Why do I have to do this
+    _ = @import("math/easings.zig");
+    _ = @import("animation//animation.zig");
 }

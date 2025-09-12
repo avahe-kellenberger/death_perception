@@ -13,7 +13,7 @@ pub const TrackKind = enum { i32, f32, bool, vector, ivector };
 pub fn TrackOpts(T: type) type {
     return struct {
         wrap_interpolation: bool = false,
-        ease: *const easings.EasingFn(T) = easings.lerp,
+        ease: *const easings.EasingFn(T) = easings.lerp(T),
     };
 }
 
@@ -32,7 +32,7 @@ pub fn Track(kind: TrackKind) type {
         field: *T,
         frames: []Keyframe(T),
         wrap_interpolation: bool,
-        ease: *const easings.EasingFn(T) = easings.lerp,
+        ease: *const easings.EasingFn(T) = easings.lerp(T),
 
         pub fn init(field: *T, frames: []Keyframe(T), opts: TrackOpts(T)) Self {
             return .{
@@ -68,13 +68,21 @@ pub const Animation = struct {
         };
     }
 
-    pub fn addTrack(self: *Self, T: TrackKind, track: Track(T)) void {
+    pub fn deinit(self: *Self) void {
+        self.i32_tracks.deinit(self.alloc);
+        self.f32_tracks.deinit(self.alloc);
+        self.bool_tracks.deinit(self.alloc);
+        self.vector_tracks.deinit(self.alloc);
+        self.ivector_tracks.deinit(self.alloc);
+    }
+
+    pub fn addTrack(self: *Self, comptime T: TrackKind, track: Track(T)) void {
         switch (T) {
-            .i32 => try self.i32_tracks.append(self.alloc, track) catch unreachable,
-            .f32 => try self.f32_tracks.append(self.alloc, track) catch unreachable,
-            .bool => try self.bool_tracks.append(self.alloc, track) catch unreachable,
-            .vector => try self.vector_tracks.append(self.alloc, track) catch unreachable,
-            .ivector => try self.ivector_tracks.append(self.alloc, track) catch unreachable,
+            .i32 => self.i32_tracks.append(self.alloc, track) catch unreachable,
+            .f32 => self.f32_tracks.append(self.alloc, track) catch unreachable,
+            .bool => self.bool_tracks.append(self.alloc, track) catch unreachable,
+            .vector => self.vector_tracks.append(self.alloc, track) catch unreachable,
+            .ivector => self.ivector_tracks.append(self.alloc, track) catch unreachable,
         }
     }
 
@@ -94,11 +102,13 @@ pub const Animation = struct {
         // for (self.ivector_tracks.items) |track| {}
     }
 
-    fn updateTrackF32(self: *Self, track: *Track(f32)) void {
-        var curr_index: i32 = -1;
+    fn updateTrackF32(self: *Self, track: *Track(.f32)) void {
+        const inf = std.math.maxInt(usize);
+        var curr_index: usize = inf;
         for (0..track.frames.len) |i| {
             if (self.current_time >= track.frames[i].time and
-                self.current_time <= track.frames[i + 1].time)
+                i < (track.frames.len - 1) and
+                self.current_time < track.frames[i + 1].time)
             {
                 curr_index = i;
                 break;
@@ -106,11 +116,12 @@ pub const Animation = struct {
         }
 
         // Between last and first frames
-        if (curr_index == -1) {
-            curr_index = track.frames[track.frames.len - 1];
+        if (curr_index == inf) {
+            curr_index = track.frames.len - 1;
         }
 
         const curr_frame = track.frames[curr_index];
+
         // Between last and first frame, and NOT interpolating between them.
         if (curr_index == track.frames.len and !track.wrap_interpolation) {
             track.field.* = curr_frame.value;
@@ -118,7 +129,7 @@ pub const Animation = struct {
         }
 
         // Ease between current and next frame
-        const next_frame = track.frames[curr_index % track.frames.len];
+        const next_frame = track.frames[(curr_index + 1) % track.frames.len];
 
         const time_between_frames = blk: {
             if (curr_index == track.frames.len) {
@@ -129,7 +140,6 @@ pub const Animation = struct {
 
         const completion: f32 = (self.current_time - curr_frame.time) / time_between_frames;
         const eased_value = track.ease(
-            @TypeOf(track.field),
             curr_frame.value,
             next_frame.value,
             completion,
@@ -141,25 +151,28 @@ pub const Animation = struct {
 
 test "Animation" {
     const alloc = std.testing.allocator;
-    const anim: Animation = .init(alloc, 4.0, false);
+    var anim: Animation = .init(alloc, 4.0, false);
+    defer anim.deinit();
 
     var foo: f32 = 1.0;
-    const track: Track(.f32) = .init(
-        &foo,
-        .{ foo, 2.0, 3.0, 4.0 },
-        .{},
-    );
+    var frames = [_]Keyframe(f32){
+        .{ .value = foo, .time = 0.0 },
+        .{ .value = 2.0, .time = 1.0 },
+        .{ .value = 3.0, .time = 2.0 },
+        .{ .value = 4.0, .time = 3.0 },
+    };
 
+    const track: Track(.f32) = .init(&foo, &frames, .{});
     anim.addTrack(.f32, track);
 
-    std.testing.expectEqual(1.0, foo);
+    try std.testing.expectEqual(1.0, foo);
 
     anim.update(1.0);
-    std.testing.expectEqual(2.0, foo);
+    try std.testing.expectEqual(2.0, foo);
 
     anim.update(1.0);
-    std.testing.expectEqual(3.0, foo);
+    try std.testing.expectEqual(3.0, foo);
 
     anim.update(1.0);
-    std.testing.expectEqual(4.0, foo);
+    try std.testing.expectEqual(4.0, foo);
 }

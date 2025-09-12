@@ -8,7 +8,7 @@ pub fn Keyframe(T: type) type {
     return struct { value: T, time: f32 };
 }
 
-pub const TrackKind = enum { i32, f32, bool, vector, ivector };
+// pub const TrackKind = enum { i32, f32, bool, vector, ivector };
 
 pub fn TrackOpts(T: type) type {
     return struct {
@@ -17,15 +17,7 @@ pub fn TrackOpts(T: type) type {
     };
 }
 
-pub fn Track(kind: TrackKind) type {
-    const T = switch (kind) {
-        .i32 => i32,
-        .f32 => f32,
-        .bool => bool,
-        .vector => Vector(f32),
-        .ivector => Vector(i32),
-    };
-
+pub fn Track(T: type) type {
     return struct {
         pub const Self = @This();
 
@@ -52,11 +44,11 @@ pub const Animation = struct {
     duration: f32,
     looping: bool,
 
-    i32_tracks: ArrayList(Track(.i32)) = .empty,
-    f32_tracks: ArrayList(Track(.f32)) = .empty,
-    bool_tracks: ArrayList(Track(.bool)) = .empty,
-    vector_tracks: ArrayList(Track(.vector)) = .empty,
-    ivector_tracks: ArrayList(Track(.ivector)) = .empty,
+    i32_tracks: ArrayList(Track(i32)) = .empty,
+    f32_tracks: ArrayList(Track(f32)) = .empty,
+    bool_tracks: ArrayList(Track(bool)) = .empty,
+    vector_tracks: ArrayList(Track(Vector(f32))) = .empty,
+    ivector_tracks: ArrayList(Track(Vector(i32))) = .empty,
 
     pub fn init(alloc: std.mem.Allocator, duration: f32, looping: bool) Self {
         return .{
@@ -74,25 +66,26 @@ pub const Animation = struct {
         self.ivector_tracks.deinit(self.alloc);
     }
 
-    pub fn addTrack(self: *Self, comptime T: TrackKind, track: Track(T)) void {
+    pub fn addTrack(self: *Self, comptime T: type, track: Track(T)) void {
         switch (T) {
-            .i32 => self.i32_tracks.append(self.alloc, track) catch unreachable,
-            .f32 => self.f32_tracks.append(self.alloc, track) catch unreachable,
-            .bool => self.bool_tracks.append(self.alloc, track) catch unreachable,
-            .vector => self.vector_tracks.append(self.alloc, track) catch unreachable,
-            .ivector => self.ivector_tracks.append(self.alloc, track) catch unreachable,
+            i32 => self.i32_tracks.append(self.alloc, track) catch unreachable,
+            f32 => self.f32_tracks.append(self.alloc, track) catch unreachable,
+            bool => self.bool_tracks.append(self.alloc, track) catch unreachable,
+            Vector(f32) => self.vector_tracks.append(self.alloc, track) catch unreachable,
+            Vector(i32) => self.ivector_tracks.append(self.alloc, track) catch unreachable,
+            else => @compileError("Unsupported animation type"),
         }
     }
 
     pub fn update(self: *Self, current_time: f32) void {
-        for (self.i32_tracks.items) |*track| self.updateTrack(.i32, track, current_time);
-        for (self.f32_tracks.items) |*track| self.updateTrack(.f32, track, current_time);
-        for (self.bool_tracks.items) |*track| self.updateTrack(.bool, track, current_time);
-        for (self.vector_tracks.items) |*track| self.updateTrack(.vector, track, current_time);
-        for (self.ivector_tracks.items) |*track| self.updateTrack(.ivector, track, current_time);
+        for (self.i32_tracks.items) |*track| self.updateTrack(i32, track, current_time);
+        for (self.f32_tracks.items) |*track| self.updateTrack(f32, track, current_time);
+        for (self.bool_tracks.items) |*track| self.updateTrack(bool, track, current_time);
+        for (self.vector_tracks.items) |*track| self.updateTrack(Vector(f32), track, current_time);
+        for (self.ivector_tracks.items) |*track| self.updateTrack(Vector(i32), track, current_time);
     }
 
-    fn updateTrack(self: *Self, comptime T: TrackKind, track: *Track(T), current_time: f32) void {
+    fn updateTrack(self: *Self, comptime T: type, track: *Track(T), current_time: f32) void {
         const inf = std.math.maxInt(usize);
         var curr_index: usize = inf;
         for (0..track.frames.len) |i| {
@@ -152,8 +145,8 @@ test "Animation" {
         .{ .value = 4.0, .time = 3.0 },
     };
 
-    const track: Track(.f32) = .init(&foo, &frames, .{});
-    anim.addTrack(.f32, track);
+    const track: Track(f32) = .init(&foo, &frames, .{});
+    anim.addTrack(f32, track);
 
     try std.testing.expectEqual(1.0, foo);
 

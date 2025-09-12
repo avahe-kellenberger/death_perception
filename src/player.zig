@@ -21,6 +21,8 @@ pub const Player = struct {
     image: Texture,
     loc: Vector = .init(0, 0),
     image_size: Vector = undefined,
+    scale: Vector = .init(1, 1),
+    // animation
 
     pub fn init() Player {
         const image = Game.loadTexture("./assets/images/player.png", .nearest);

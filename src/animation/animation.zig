@@ -13,7 +13,7 @@ pub const TrackKind = enum { i32, f32, bool, vector, ivector };
 pub fn TrackOpts(T: type) type {
     return struct {
         wrap_interpolation: bool = false,
-        ease: easings.EasingFn(T) = easings.lerp,
+        ease: *const easings.EasingFn(T) = easings.lerp,
     };
 }
 
@@ -32,7 +32,7 @@ pub fn Track(kind: TrackKind) type {
         field: *T,
         frames: []Keyframe(T),
         wrap_interpolation: bool,
-        ease: easings.EasingFn(T) = easings.lerp,
+        ease: *const easings.EasingFn(T) = easings.lerp,
 
         pub fn init(field: *T, frames: []Keyframe(T), opts: TrackOpts(T)) Self {
             return .{

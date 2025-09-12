@@ -83,6 +83,7 @@ pub fn init() void {
         .handler = struct {
             fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: *anyopaque) void {
                 // TODO should animate going into the door in the background
+                Game.state = .in_game;
             }
         }.handler,
     };

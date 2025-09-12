@@ -33,19 +33,19 @@ pub const Player = struct {
     anim_player: AnimationPlayer,
     render_offset: Vector = .init(0, 0),
 
-    pub fn init(alloc: Allocator) *Player {
+    pub fn init() *Player {
         const image = Game.loadTexture("./assets/images/player.png", .nearest);
 
-        var player: *Player = alloc.create(Player) catch unreachable;
+        var player: *Player = Game.alloc.create(Player) catch unreachable;
         player.image = image;
         player.image_size = .{ .x = Game.tile_size, .y = Game.tile_size };
-        player.anim_player = .init(alloc);
+        player.anim_player = .init(Game.alloc);
 
         // Create idle animation
         {
-            var idle_anim: Animation = .init(alloc, 1.2);
+            var idle_anim: Animation = .init(Game.alloc, 1.2);
             idle_anim.addTrack(Vector, .init(
-                alloc,
+                Game.alloc,
                 &player.scale,
                 &.{
                     .{ .value = .init(1, 1), .time = 0.0 },

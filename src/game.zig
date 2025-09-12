@@ -13,6 +13,7 @@ const Input = @import("input.zig");
 const ui = @import("./ui/lib/component.zig");
 const TestUI = @import("./ui/test.zig");
 const MainMenu = @import("./ui/main_menu.zig");
+const Lobby = @import("./ui/lobby.zig");
 
 const Level1 = @import("./levels/level1.zig").Level1;
 
@@ -47,6 +48,7 @@ pub fn init(_alloc: Allocator, _renderer: Renderer, _camera: Camera) void {
     camera = _camera;
 
     MainMenu.init();
+    Lobby.init();
 
     level = Level1.init();
     // TODO
@@ -61,6 +63,7 @@ pub fn input(event: sdl.events.Event) void {
     switch (state) {
         .test_ui => TestUI.input(event),
         .main_menu => MainMenu.input(event),
+        .lobby => Lobby.input(event),
         else => {
             // Others
         },
@@ -68,11 +71,6 @@ pub fn input(event: sdl.events.Event) void {
 }
 
 pub fn update(frame_delay: f32) void {
-    if (Input.isKeyPressed(.m)) {
-        state = .main_menu;
-    } else if (Input.isKeyPressed(.g)) {
-        state = .in_game;
-    }
     switch (state) {
         .test_ui => {
             TestUI.update(frame_delay);
@@ -81,7 +79,7 @@ pub fn update(frame_delay: f32) void {
             MainMenu.update(frame_delay);
         },
         .lobby => {
-            // TODO
+            Lobby.update(frame_delay);
         },
         .load_game => {
             // TODO
@@ -121,7 +119,7 @@ pub fn render() void {
             MainMenu.render(camera.size.x, camera.size.y);
         },
         .lobby => {
-            // TODO
+            Lobby.render(camera.size.x, camera.size.y);
         },
         .load_game => {
             // TODO

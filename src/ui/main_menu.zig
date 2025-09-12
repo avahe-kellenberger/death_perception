@@ -52,7 +52,8 @@ pub fn init() void {
     foreground.setPadding(50);
 
     var title = UIComponent.init();
-    title.setHeight(200);
+    title.setMarginInsets(.{ .top = 50 });
+    title.setHeight(100);
     title.content = .{
         .text = .{
             .content = .borrow("Death Perception"),

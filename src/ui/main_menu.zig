@@ -10,22 +10,48 @@ const UIComponent = ui.Component;
 
 const Color = @import("../color.zig").Color;
 const Input = @import("../input.zig");
+const t = @import("./lib/content/sprite.zig").SpriteCoord.xy;
+const Spritesheet = @import("../spritesheet.zig").Spritesheet;
 const Game = @import("../game.zig");
 
 var root: ?UIComponent = null;
 
-pub fn init(alloc: Allocator) void {
+var background_texture: ?sdl.render.Texture = null;
+
+pub fn init() void {
     deinit();
 
-    var background = UIComponent.init(alloc);
-    background.background_color = .{ .r = 100 };
-    // TODO use tiled content
+    const new_background_texture = Game.loadTexture("./assets/tilemap_packed.png", .nearest);
+    background_texture = new_background_texture;
+    const background_sheet = Spritesheet.init(new_background_texture, 12, 11);
 
-    var foreground = UIComponent.init(alloc);
+    var background = UIComponent.init();
+    background.setStackDirection(.overlap);
+    background.content = .{
+        .sprite = .{
+            .sheet = background_sheet,
+            .mode = .{
+                .tiled = .clone(&.{
+                    &(.{t(4, 3)} ** 11),
+                    &(.{t(4, 3)} ** 11),
+                    &(.{t(4, 3)} ** 4 ++ .{ t(5, 2), t(9, 3), t(5, 2) } ++ .{t(4, 3)} ** 4),
+                    &(.{t(2, 4)} ** 11),
+                }),
+            },
+            .scale = .init(16, 13),
+            .align_h = .center,
+        },
+    };
+
+    var background_filter = UIComponent.init();
+    background_filter.background_color = .{ .r = 50, .g = 10, .b = 10, .a = 150 };
+    background.add(background_filter);
+
+    var foreground = UIComponent.init();
     foreground.setHorizontalAlignment(.center);
     foreground.setPadding(50);
 
-    var title = UIComponent.init(alloc);
+    var title = UIComponent.init();
     title.setHeight(200);
     title.content = .{
         .text = .{
@@ -46,12 +72,12 @@ pub fn init(alloc: Allocator) void {
     };
     foreground.add(title);
 
-    var menu = UIComponent.init(alloc);
+    var menu = UIComponent.init();
     menu.setStackDirection(.vertical);
     menu.setMargin(100);
     menu.setWidth(250);
 
-    var start_button = createMenuButton(alloc, "Start");
+    var start_button = createMenuButton("Start");
     start_button.on_mouse_button = .{
         .context = undefined,
         .handler = struct {
@@ -62,7 +88,7 @@ pub fn init(alloc: Allocator) void {
     };
     menu.add(start_button);
 
-    var settings_button = createMenuButton(alloc, "Settings");
+    var settings_button = createMenuButton("Settings");
     settings_button.on_mouse_button = .{
         .context = undefined,
         .handler = struct {
@@ -73,7 +99,7 @@ pub fn init(alloc: Allocator) void {
     };
     menu.add(settings_button);
 
-    var quit_button = createMenuButton(alloc, "Quit");
+    var quit_button = createMenuButton("Quit");
     quit_button.on_mouse_button = .{
         .context = undefined,
         .handler = struct {
@@ -86,7 +112,7 @@ pub fn init(alloc: Allocator) void {
 
     foreground.add(menu);
 
-    var r = UIComponent.init(alloc);
+    var r = UIComponent.init();
     r.setStackDirection(.overlap);
     r.add(background);
     r.add(foreground);
@@ -98,6 +124,10 @@ pub fn deinit() void {
     if (root) |*r| {
         r.deinit();
         root = null;
+    }
+    if (background_texture) |*bs| {
+        bs.deinit();
+        background_texture = null;
     }
 }
 
@@ -118,9 +148,9 @@ pub fn render(width: f32, height: f32) void {
     }
 }
 
-fn createMenuButton(alloc: Allocator, comptime text: []const u8) UIComponent {
+fn createMenuButton(comptime text: []const u8) UIComponent {
     const button_color: Color = .{ .r = 11, .g = 50, .b = 69 };
-    var button = UIComponent.init(alloc);
+    var button = UIComponent.init();
     button.setHeight(60);
     button.setMarginInsets(.{ .bottom = 25 });
     button.background_color = button_color;

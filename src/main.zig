@@ -32,7 +32,9 @@ pub fn main() !void {
 
     // End of SDL init
 
-    Input.init(std.heap.smp_allocator);
+    const alloc = std.heap.smp_allocator;
+
+    Input.init(alloc);
     defer Input.deinit();
 
     random_mod.init();
@@ -45,8 +47,6 @@ pub fn main() !void {
     );
     const renderer = initResult.renderer;
     const window = initResult.window;
-
-    const alloc = std.heap.smp_allocator;
 
     var display = try sdl.video.Display.getPrimaryDisplay();
     const modes = try display.getFullscreenModes(alloc);
@@ -64,8 +64,8 @@ pub fn main() !void {
         alloc,
         renderer,
         Camera.init(.{ .x = 0, .y = 0 }, .{
-            .w = @floatFromInt(window_size.width),
-            .h = @floatFromInt(window_size.height),
+            .x = @floatFromInt(window_size.width),
+            .y = @floatFromInt(window_size.height),
         }),
     );
     defer Game.deinit();

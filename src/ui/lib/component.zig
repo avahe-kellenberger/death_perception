@@ -49,7 +49,6 @@ pub const Component = struct {
     const Self = @This();
 
     _id: u32,
-    _alloc: Allocator,
 
     // Top-down design: child components cannot cause their parent components to resize.
     _parent: ?*Component = null,
@@ -88,11 +87,10 @@ pub const Component = struct {
     on_mouse_enter: ?EventSpec(sdl.events.MouseMotion) = null,
     on_mouse_exit: ?EventSpec(sdl.events.MouseMotion) = null,
 
-    pub fn init(alloc: Allocator) Self {
+    pub fn init() Self {
         defer next_id += 1;
         return .{
             ._id = next_id,
-            ._alloc = alloc,
         };
     }
 
@@ -101,7 +99,7 @@ pub const Component = struct {
             var child = kv.value;
             child.deinit();
         }
-        self._children.deinit(self._alloc);
+        self._children.deinit(Game.alloc);
         self.content.deinit();
     }
 
@@ -110,7 +108,7 @@ pub const Component = struct {
     pub fn add(self: *Self, child: Component) void {
         var new_child = child;
         new_child._parent = self;
-        self._children.put(self._alloc, new_child._id, new_child) catch unreachable;
+        self._children.put(Game.alloc, new_child._id, new_child) catch unreachable;
         self.setLayoutStatus(.invalid);
     }
 

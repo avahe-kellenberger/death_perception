@@ -1,10 +1,8 @@
 // Testing UI
 
-const std = @import("std");
-const Allocator = std.mem.Allocator;
-
 const sdl = @import("sdl3");
 
+const Game = @import("../game.zig");
 const ui = @import("./lib/component.zig");
 const UIComponent = ui.Component;
 
@@ -13,10 +11,10 @@ const Input = @import("../input.zig");
 var root: ?UIComponent = null;
 var fit: bool = false;
 
-pub fn init(alloc: Allocator) void {
+pub fn init() void {
     deinit();
 
-    var top_left = UIComponent.init(alloc);
+    var top_left = UIComponent.init();
     top_left.setMarginInsets(.{ .right = 50 });
     top_left.setWidth(200);
     top_left.setHeight(200);
@@ -32,7 +30,7 @@ pub fn init(alloc: Allocator) void {
         },
     };
 
-    var top_center = UIComponent.init(alloc);
+    var top_center = UIComponent.init();
     top_center.setMarginInsets(.{ .right = 50 });
     top_center.setWidth(200);
     top_center.setHeight(200);
@@ -48,7 +46,7 @@ pub fn init(alloc: Allocator) void {
         },
     };
 
-    var top_right = UIComponent.init(alloc);
+    var top_right = UIComponent.init();
     top_right.setWidth(200);
     top_right.setHeight(200);
     top_right.background_color = .{
@@ -63,7 +61,7 @@ pub fn init(alloc: Allocator) void {
         },
     };
 
-    var center_left = UIComponent.init(alloc);
+    var center_left = UIComponent.init();
     center_left.setMarginInsets(.{ .right = 50 });
     center_left.setWidth(200);
     center_left.setHeight(200);
@@ -79,7 +77,7 @@ pub fn init(alloc: Allocator) void {
         },
     };
 
-    var center_center = UIComponent.init(alloc);
+    var center_center = UIComponent.init();
     center_center.setMarginInsets(.{ .right = 50 });
     center_center.setPadding(10);
     center_center.setWidth(200);
@@ -114,7 +112,7 @@ pub fn init(alloc: Allocator) void {
         }.handler,
     };
 
-    var center_right = UIComponent.init(alloc);
+    var center_right = UIComponent.init();
     center_right.setWidth(200);
     center_right.setHeight(200);
     center_right.background_color = .{
@@ -129,7 +127,7 @@ pub fn init(alloc: Allocator) void {
         },
     };
 
-    var bottom_left = UIComponent.init(alloc);
+    var bottom_left = UIComponent.init();
     bottom_left.setMarginInsets(.{ .right = 50 });
     bottom_left.setWidth(200);
     bottom_left.setHeight(200);
@@ -145,7 +143,7 @@ pub fn init(alloc: Allocator) void {
         },
     };
 
-    var bottom_center = UIComponent.init(alloc);
+    var bottom_center = UIComponent.init();
     bottom_center.setMarginInsets(.{ .right = 50 });
     bottom_center.setWidth(200);
     bottom_center.setHeight(200);
@@ -161,7 +159,7 @@ pub fn init(alloc: Allocator) void {
         },
     };
 
-    var bottom_right = UIComponent.init(alloc);
+    var bottom_right = UIComponent.init();
     bottom_right.setWidth(200);
     bottom_right.setHeight(200);
     bottom_right.background_color = .{
@@ -176,7 +174,7 @@ pub fn init(alloc: Allocator) void {
         },
     };
 
-    var top_row = UIComponent.init(alloc);
+    var top_row = UIComponent.init();
     top_row.setStackDirection(.horizontal);
     top_row.setHorizontalAlignment(.center);
     top_row.setMarginInsets(.{ .bottom = 50 });
@@ -185,7 +183,7 @@ pub fn init(alloc: Allocator) void {
     top_row.add(top_center);
     top_row.add(top_right);
 
-    var center_row = UIComponent.init(alloc);
+    var center_row = UIComponent.init();
     center_row.setStackDirection(.horizontal);
     center_row.setHorizontalAlignment(.center);
     center_row.setMarginInsets(.{ .bottom = 50 });
@@ -194,7 +192,7 @@ pub fn init(alloc: Allocator) void {
     center_row.add(center_center);
     center_row.add(center_right);
 
-    var bottom_row = UIComponent.init(alloc);
+    var bottom_row = UIComponent.init();
     bottom_row.setStackDirection(.horizontal);
     bottom_row.setHorizontalAlignment(.center);
     bottom_row.setHeight(200);
@@ -202,7 +200,7 @@ pub fn init(alloc: Allocator) void {
     bottom_row.add(bottom_center);
     bottom_row.add(bottom_right);
 
-    var box = UIComponent.init(alloc);
+    var box = UIComponent.init();
     box.setStackDirection(.vertical);
     box.setHorizontalAlignment(.center);
     box.setVerticalAlignment(.center);
@@ -215,7 +213,7 @@ pub fn init(alloc: Allocator) void {
     box.add(center_row);
     box.add(bottom_row);
 
-    var r = UIComponent.init(alloc);
+    var r = UIComponent.init();
     r.setPadding(50);
     r.add(box);
 
@@ -239,11 +237,9 @@ pub fn update(frame_delay: f32) void {
     // TODO
     _ = frame_delay;
 
-    if (root) |r| {
-        if (Input.isKeyPressed(.f)) {
-            fit = !fit;
-            init(r._alloc);
-        }
+    if (Input.isKeyPressed(.f)) {
+        fit = !fit;
+        init();
     }
 }
 

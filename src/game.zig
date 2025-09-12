@@ -30,6 +30,7 @@ pub const GameState = enum {
     test_ui,
 };
 
+pub var alloc: Allocator = undefined;
 pub var state: GameState = .main_menu;
 pub var renderer: Renderer = undefined;
 pub var camera: Camera = undefined;
@@ -39,13 +40,14 @@ pub const tile_size: f32 = 16.0;
 
 var level: Level1 = undefined;
 
-pub fn init(alloc: Allocator, _renderer: Renderer, _camera: Camera) void {
+pub fn init(_alloc: Allocator, _renderer: Renderer, _camera: Camera) void {
+    alloc = _alloc;
     renderer = _renderer;
     camera = _camera;
 
-    MainMenu.init(alloc);
+    MainMenu.init();
 
-    level = Level1.init(alloc);
+    level = Level1.init();
     // TODO
 }
 
@@ -109,10 +111,10 @@ pub fn render() void {
 
     switch (state) {
         .test_ui => {
-            TestUI.render(camera.size.w, camera.size.h);
+            TestUI.render(camera.size.x, camera.size.y);
         },
         .main_menu => {
-            MainMenu.render(camera.size.w, camera.size.h);
+            MainMenu.render(camera.size.x, camera.size.y);
         },
         .lobby => {
             // TODO

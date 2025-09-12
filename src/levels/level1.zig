@@ -28,8 +28,6 @@ pub const Level1 = struct {
     var floor_tiles_image: Texture = undefined;
     var wall_tiles_image: Texture = undefined;
 
-    alloc: Allocator,
-
     player: Player,
     map: Map,
 
@@ -37,7 +35,7 @@ pub const Level1 = struct {
     raycast_start_loc: ?Vector = null,
     raycast_end_loc: ?Vector = null,
 
-    pub fn init(alloc: Allocator) Level1 {
+    pub fn init() Level1 {
         // Map floor color so we can ignore drawing "empty" tiles
         Game.bg_color = .{ .r = 139, .g = 155, .b = 180, .a = 255 };
 
@@ -52,9 +50,8 @@ pub const Level1 = struct {
         player.loc.y = Map.tile_size * 70;
 
         return .{
-            .alloc = alloc,
             .player = player,
-            .map = .init(alloc, floor_sheet, wall_sheet, 47.0, 10),
+            .map = .init(floor_sheet, wall_sheet, 47.0, 10),
         };
     }
 
@@ -88,7 +85,7 @@ pub const Level1 = struct {
 
             const player_loc = self.player.loc;
             if (collides(
-                self.alloc,
+                Game.alloc,
                 player_loc,
                 Player.collision_shape,
                 player_loc.subtract(start_loc),

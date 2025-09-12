@@ -4,8 +4,6 @@ const sdl = @import("sdl3");
 const FRect = sdl.rect.FRect;
 const Vector = @import("math/vector.zig").Vector(f32);
 
-const Size = @import("size.zig").Size;
-
 const DEFAULT_Z: f32 = 1.0;
 
 pub const Camera = struct {
@@ -15,7 +13,7 @@ pub const Camera = struct {
     _loc: Vector,
 
     // Camera size (in screen coordinates)
-    size: Size(f32),
+    size: Vector,
 
     // Camera zoom
     _z: f32 = 0,
@@ -23,7 +21,7 @@ pub const Camera = struct {
     /// Outer bounds of camera (in game coordinates)
     viewport: FRect = .{ .x = 0, .y = 0, .w = 0, .h = 0 },
 
-    pub fn init(loc: Vector, size: Size(f32)) Camera {
+    pub fn init(loc: Vector, size: Vector) Camera {
         var cam: Camera = .{
             ._loc = loc,
             .size = size,
@@ -44,8 +42,8 @@ pub const Camera = struct {
     }
 
     pub fn setSize(self: *Self, w: f32, h: f32) void {
-        self.size.w = w;
-        self.size.h = h;
+        self.size.x = w;
+        self.size.y = h;
         self.updateViewport();
     }
 
@@ -56,8 +54,8 @@ pub const Camera = struct {
 
     fn updateViewport(self: *Self) void {
         if (self.getScale()) |scale| {
-            self.viewport.w = self.size.w / scale;
-            self.viewport.h = self.size.h / scale;
+            self.viewport.w = self.size.x / scale;
+            self.viewport.h = self.size.y / scale;
             self.viewport.x = self._loc.x - (self.viewport.w * 0.5);
             self.viewport.y = self._loc.y - (self.viewport.h * 0.5);
         }

@@ -1,6 +1,5 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const Allocator = std.mem.Allocator;
 
 const sdl = @import("sdl3");
 const Renderer = sdl.render.Renderer;
@@ -22,8 +21,8 @@ const CollisionShape = @import("math/collisionshape.zig").CollisionShape;
 const Color = @import("color.zig").Color;
 
 pub const Tile = struct {
-    floor_image_index: isize = -1,
-    wall_image_index: isize = -1,
+    floor_image_index: i32 = -1,
+    wall_image_index: i32 = -1,
     neighbor_bit_sum: u8 = 0,
     is_wall: bool = false,
 };
@@ -39,7 +38,6 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
         pub const Self = @This();
         pub const tile_size: f32 = _tile_size;
 
-        alloc: Allocator,
         floor_tiles_sheet: Spritesheet,
         wall_tiles_sheet: Spritesheet,
         tiles: *Array2D(Tile, width, height),
@@ -47,17 +45,15 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
         collision_shape: CollisionShape,
 
         pub fn init(
-            alloc: Allocator,
             floor_tiles_sheet: Spritesheet,
             wall_tiles_sheet: Spritesheet,
             density: f32,
             border_thickness: usize,
         ) Map(width, height, _tile_size) {
-            var tiles = alloc.create(Array2D(Tile, width, height)) catch unreachable;
+            var tiles = Game.alloc.create(Array2D(Tile, width, height)) catch unreachable;
             tiles.setAllValues(Tile{});
 
             var result = Map(width, height, _tile_size){
-                .alloc = alloc,
                 .floor_tiles_sheet = floor_tiles_sheet,
                 .wall_tiles_sheet = wall_tiles_sheet,
                 .tiles = tiles,
@@ -86,8 +82,7 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
         }
 
         pub fn deinit(self: *Self) void {
-            self.floor_tiles_sheet.deinit();
-            self.wall_tiles_sheet.deinit();
+            Game.alloc.destroy(self.tiles);
         }
 
         fn processCellularAutoma(self: *Self) void {
@@ -140,8 +135,8 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
 
             var rooms: std.ArrayList([]Coordinate) = .empty;
             defer {
-                for (rooms.items) |room| self.alloc.free(room);
-                rooms.deinit(self.alloc);
+                for (rooms.items) |room| Game.alloc.free(room);
+                rooms.deinit(Game.alloc);
             }
 
             var iter = self.tiles.iterator();
@@ -154,41 +149,41 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 // New tile we haven't seen before!
                 // Start flood fill for current room
                 var room: std.ArrayList(Coordinate) = .empty;
-                defer room.deinit(self.alloc);
+                defer room.deinit(Game.alloc);
 
                 // Flood fill find all connected floor tiles
                 var queue: std.ArrayList(Coordinate) = .empty;
-                defer queue.deinit(self.alloc);
+                defer queue.deinit(Game.alloc);
 
-                try queue.append(self.alloc, .{ .x = e.x, .y = e.y });
+                try queue.append(Game.alloc, .{ .x = e.x, .y = e.y });
                 while (queue.pop()) |n| {
                     if (self.tiles.get(n.x, n.y).is_wall or visited.get(n.x, n.y).*) continue;
                     // Add tile to the current room
-                    try room.append(self.alloc, n);
+                    try room.append(Game.alloc, n);
                     visited.set(n.x, n.y, true);
 
-                    if (n.x > 0) try queue.append(self.alloc, .{
+                    if (n.x > 0) try queue.append(Game.alloc, .{
                         .x = n.x - 1,
                         .y = n.y,
                     });
 
-                    if (n.x + 1 < width) try queue.append(self.alloc, .{
+                    if (n.x + 1 < width) try queue.append(Game.alloc, .{
                         .x = n.x + 1,
                         .y = n.y,
                     });
 
-                    if (n.y > 0) try queue.append(self.alloc, .{
+                    if (n.y > 0) try queue.append(Game.alloc, .{
                         .x = n.x,
                         .y = n.y - 1,
                     });
 
-                    if (n.y + 1 < height) try queue.append(self.alloc, .{
+                    if (n.y + 1 < height) try queue.append(Game.alloc, .{
                         .x = n.x,
                         .y = n.y + 1,
                     });
                 }
 
-                try rooms.append(self.alloc, try room.toOwnedSlice(self.alloc));
+                try rooms.append(Game.alloc, try room.toOwnedSlice(Game.alloc));
             }
 
             // Sort rooms by size in descending order
@@ -304,8 +299,8 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 var iter = self.tiles.window(window);
                 while (iter.next()) |e| {
                     if (e.t.floor_image_index >= 0) {
-                        const sprite_rect = self.floor_tiles_sheet.sprites[@intCast(e.t.floor_image_index)];
-                        Game.renderTexture(self.floor_tiles_sheet.sheet, sprite_rect, .{
+                        const sprite_rect = self.floor_tiles_sheet.index(@intCast(e.t.floor_image_index));
+                        Game.renderTexture(self.floor_tiles_sheet.texture, sprite_rect, .{
                             .x = @as(f32, @floatFromInt(e.x)) * tile_size,
                             .y = @as(f32, @floatFromInt(e.y)) * tile_size,
                             .w = tile_size,
@@ -320,8 +315,8 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 var iter = self.tiles.window(window);
                 while (iter.next()) |e| {
                     if (e.t.wall_image_index >= 0) {
-                        const sprite_rect = self.wall_tiles_sheet.sprites[@intCast(e.t.wall_image_index)];
-                        Game.renderTexture(self.wall_tiles_sheet.sheet, sprite_rect, .{
+                        const sprite_rect = self.wall_tiles_sheet.index(@intCast(e.t.wall_image_index));
+                        Game.renderTexture(self.wall_tiles_sheet.texture, sprite_rect, .{
                             .x = @as(f32, @floatFromInt(e.x)) * tile_size,
                             .y = @as(f32, @floatFromInt(e.y)) * tile_size,
                             .w = tile_size,

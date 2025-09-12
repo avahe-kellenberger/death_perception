@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const Game = @import("../../game.zig");
 const StackDirection = @import("./types.zig").StackDirection;
 const Component = @import("./component.zig").Component;
 
@@ -326,7 +327,7 @@ fn alignSpaceEvenlyMainAxis(comp: *Component, comptime axis: StackDirection) voi
     const max_child_len = determineDynamicChildLenMainAxis(comp, axis);
 
     var total_children_len: f32 = 0.0;
-    var margins: MarginQueue = .init(comp._alloc, {});
+    var margins: MarginQueue = .init(Game.alloc, {});
     defer margins.deinit();
     var prev_child: ?*Component = null;
 

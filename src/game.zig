@@ -11,6 +11,7 @@ const Camera = @import("camera.zig").Camera;
 const Input = @import("input.zig");
 
 const ui = @import("./ui/lib/component.zig");
+const TestUI = @import("./ui/test.zig");
 const MainMenu = @import("./ui/main_menu.zig");
 
 const Level1 = @import("./levels/level1.zig").Level1;
@@ -24,8 +25,12 @@ pub const GameState = enum {
     paused,
     paused_settings,
     game_over,
+    quit,
+
+    test_ui,
 };
 
+pub var alloc: Allocator = undefined;
 pub var state: GameState = .main_menu;
 pub var renderer: Renderer = undefined;
 pub var camera: Camera = undefined;
@@ -35,13 +40,14 @@ pub const tile_size: f32 = 16.0;
 
 var level: Level1 = undefined;
 
-pub fn init(alloc: Allocator, _renderer: Renderer, _camera: Camera) void {
+pub fn init(_alloc: Allocator, _renderer: Renderer, _camera: Camera) void {
+    alloc = _alloc;
     renderer = _renderer;
     camera = _camera;
 
-    MainMenu.init(alloc);
+    MainMenu.init();
 
-    level = Level1.init(alloc);
+    level = Level1.init();
     // TODO
 }
 
@@ -52,6 +58,7 @@ pub fn deinit() void {
 
 pub fn input(event: sdl.events.Event) void {
     switch (state) {
+        .test_ui => TestUI.input(event),
         .main_menu => MainMenu.input(event),
         else => {
             // Others
@@ -66,6 +73,9 @@ pub fn update(frame_delay: f32) void {
         state = .in_game;
     }
     switch (state) {
+        .test_ui => {
+            TestUI.update(frame_delay);
+        },
         .main_menu => {
             MainMenu.update(frame_delay);
         },
@@ -90,16 +100,21 @@ pub fn update(frame_delay: f32) void {
         .game_over => {
             // TODO
         },
+        .quit => {},
     }
 }
 
 pub fn render() void {
+    renderer.setDrawBlendMode(.blend) catch unreachable;
     renderer.setDrawColor(bg_color) catch unreachable;
     renderer.clear() catch unreachable;
 
     switch (state) {
+        .test_ui => {
+            TestUI.render(camera.size.x, camera.size.y);
+        },
         .main_menu => {
-            MainMenu.render(camera.size.w, camera.size.h);
+            MainMenu.render(camera.size.x, camera.size.y);
         },
         .lobby => {
             // TODO
@@ -128,6 +143,7 @@ pub fn render() void {
         .game_over => {
             // TODO
         },
+        .quit => {},
     }
 }
 
@@ -156,12 +172,4 @@ pub fn fillRect(dst: FRect, color: sdl.pixels.Color) void {
         renderer.setDrawColor(color) catch unreachable;
         renderer.renderFillRect(r) catch unreachable;
     };
-}
-
-pub fn setBlendMode(mode: sdl.blend_mode.Mode) void {
-    renderer.setDrawBlendMode(mode) catch unreachable;
-}
-
-pub fn resetBlendMode() void {
-    renderer.setDrawBlendMode(.none) catch unreachable;
 }

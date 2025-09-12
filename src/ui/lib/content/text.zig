@@ -62,7 +62,18 @@ const TextAlignment = enum {
 
 const Font = struct {
     file: []const u8 = "./assets/fonts/kennypixel.ttf",
-    size: f32 = 64.0,
+    size: f32 = 48.0,
+    outline: ?struct {
+        size: u32,
+        color: Color,
+        align_h: TextAlignment = .start,
+        align_v: TextAlignment = .start,
+    } = null,
+};
+
+const Image = struct {
+    texture: sdl.render.Texture,
+    outline: ?sdl.render.Texture,
 };
 
 pub const ComponentText = struct {
@@ -75,7 +86,7 @@ pub const ComponentText = struct {
     font: Font = .{},
     color: Color = .black,
 
-    _image: ?sdl.render.Texture = null,
+    _image: ?Image = null,
 
     pub fn init(self: *Self) void {
         _ = self.ensureImage();
@@ -88,12 +99,15 @@ pub const ComponentText = struct {
 
     fn clearImage(self: *Self) void {
         if (self._image) |img| {
-            img.deinit();
+            img.texture.deinit();
+            if (img.outline) |o| {
+                o.deinit();
+            }
             self._image = null;
         }
     }
 
-    fn ensureImage(self: *const Self) ?sdl.render.Texture {
+    fn ensureImage(self: *const Self) ?Image {
         const text = self.content.ref();
         if (text.len == 0) {
             @constCast(self).clearImage();
@@ -107,7 +121,17 @@ pub const ComponentText = struct {
             defer surface.deinit();
             const texture = Game.renderer.createTextureFromSurface(surface) catch unreachable;
 
-            @constCast(self)._image = texture;
+            const outline: ?sdl.render.Texture = if (self.font.outline) |o| outline: {
+                f.setOutline(@intCast(o.size)) catch unreachable;
+                const outline_surface = f.renderTextBlendedWrapped(text, o.color.ttf(), 0) catch unreachable;
+                defer outline_surface.deinit();
+                break :outline Game.renderer.createTextureFromSurface(outline_surface) catch unreachable;
+            } else null;
+
+            @constCast(self)._image = .{
+                .texture = texture,
+                .outline = outline,
+            };
         }
         return self._image;
     }
@@ -116,16 +140,15 @@ pub const ComponentText = struct {
         const img = self.ensureImage() orelse return;
 
         const img_size: Vector = .init(
-            @floatFromInt(img.getWidth()),
-            @floatFromInt(img.getHeight()),
+            @floatFromInt(img.texture.getWidth()),
+            @floatFromInt(img.texture.getHeight()),
         );
-
-        const target_size: Vector = if (self.fit) target_size: {
+        const scale: f32 = if (self.fit) scale: {
             const scale_x: f32 = content_area.width() / img_size.x;
             const scale_y: f32 = content_area.height() / img_size.y;
-            const min_scale: f32 = @min(scale_x, scale_y);
-            break :target_size img_size.scale(min_scale);
-        } else img_size;
+            break :scale @min(scale_x, scale_y);
+        } else 1.0;
+        const target_size: Vector = img_size.scale(scale);
 
         const x_left: f32 = switch (self.align_h) {
             .start => content_area.left,
@@ -139,12 +162,36 @@ pub const ComponentText = struct {
             .end => content_area.bottom - target_size.y,
         };
 
-        Game.renderer.renderTexture(img, .{
-            .x = 0,
-            .y = 0,
-            .w = img_size.x,
-            .h = img_size.y,
-        }, .{
+        if (self.font.outline) |outline| {
+            if (img.outline) |outline_texture| {
+                const outline_size: Vector = .init(
+                    @floatFromInt(outline_texture.getWidth()),
+                    @floatFromInt(outline_texture.getHeight()),
+                );
+                const outline_target_size: Vector = outline_size.scale(scale);
+                const overlap: Vector = outline_size.subtract(img_size);
+
+                const out_x_left: f32 = switch (outline.align_h) {
+                    .start => x_left,
+                    .center => x_left - overlap.x / 2.0,
+                    .end => x_left - overlap.x,
+                };
+                const out_y_top: f32 = switch (outline.align_v) {
+                    .start => y_top,
+                    .center => y_top - overlap.y / 2.0,
+                    .end => y_top - overlap.y,
+                };
+
+                Game.renderer.renderTexture(outline_texture, null, .{
+                    .x = out_x_left,
+                    .y = out_y_top,
+                    .w = outline_target_size.x,
+                    .h = outline_target_size.y,
+                }) catch unreachable;
+            }
+        }
+
+        Game.renderer.renderTexture(img.texture, null, .{
             .x = x_left,
             .y = y_top,
             .w = target_size.x,

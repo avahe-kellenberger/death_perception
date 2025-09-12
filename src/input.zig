@@ -16,15 +16,12 @@ pub const InputState = enum {
 const Mouse = struct {
     pub const Self = @This();
 
-    alloc: Allocator,
-
     loc: Vector,
     buttons: std.AutoHashMap(Button, InputState),
 
-    pub fn init(a: Allocator) Self {
+    pub fn init() Self {
         const mouse_state = sdl.mouse.getState();
         return .{
-            .alloc = a,
             .loc = .{ .x = mouse_state.x, .y = mouse_state.y },
             .buttons = .init(alloc),
         };
@@ -63,13 +60,10 @@ const Mouse = struct {
 const Keyboard = struct {
     pub const Self = @This();
 
-    alloc: Allocator,
-
     keys: std.AutoHashMap(Keycode, InputState),
 
-    pub fn init(a: Allocator) Self {
+    pub fn init() Self {
         return .{
-            .alloc = a,
             .keys = .init(alloc),
         };
     }
@@ -117,8 +111,8 @@ pub var keyboard: Keyboard = undefined;
 
 pub fn init(a: Allocator) void {
     alloc = a;
-    mouse = .init(alloc);
-    keyboard = .init(alloc);
+    mouse = .init();
+    keyboard = .init();
 }
 
 pub fn deinit() void {

@@ -453,7 +453,9 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                     }
 
                     if (@abs(iter.current_loc.x - iter.start.x) >= @abs(iter.dx)) {
-                        iter.next_tile = null;
+                        if (@abs(iter.current_loc.y - iter.start.y) >= @abs(iter.dy)) {
+                            iter.next_tile = null;
+                        }
                     }
                 }
                 return return_tile;

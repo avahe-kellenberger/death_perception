@@ -48,6 +48,12 @@ pub fn Track(kind: TrackKind) type {
 pub const Animation = struct {
     pub const Self = @This();
 
+    const updateTrackF32 = updateTrack(.f32);
+    const updateTrackI32 = updateTrack(.i32);
+    const updateTrackBool = updateTrack(.bool);
+    const updateTrackVector = updateTrack(.vector);
+    const updateTrackIVector = updateTrack(.ivector);
+
     alloc: std.mem.Allocator,
     current_time: f32,
     duration: f32,
@@ -95,57 +101,61 @@ pub const Animation = struct {
             }
         }
 
-        // for (self.i32_tracks.items) |track| {}
+        for (self.i32_tracks.items) |*track| self.updateTrackI32(track);
         for (self.f32_tracks.items) |*track| self.updateTrackF32(track);
-        // for (self.bool_tracks.items) |track| {}
-        // for (self.vector_tracks.items) |track| {}
-        // for (self.ivector_tracks.items) |track| {}
+        for (self.bool_tracks.items) |*track| self.updateTrackBool(track);
+        for (self.vector_tracks.items) |*track| self.updateTrackVector(track);
+        for (self.ivector_tracks.items) |*track| self.updateTrackIVector(track);
     }
 
-    fn updateTrackF32(self: *Self, track: *Track(.f32)) void {
-        const inf = std.math.maxInt(usize);
-        var curr_index: usize = inf;
-        for (0..track.frames.len) |i| {
-            if (self.current_time >= track.frames[i].time and
-                i < (track.frames.len - 1) and
-                self.current_time < track.frames[i + 1].time)
-            {
-                curr_index = i;
-                break;
+    fn updateTrack(T: TrackKind) fn (self: *Self, track: *Track(T)) void {
+        return struct {
+            fn foo(self: *Self, track: *Track(T)) void {
+                const inf = std.math.maxInt(usize);
+                var curr_index: usize = inf;
+                for (0..track.frames.len) |i| {
+                    if (self.current_time >= track.frames[i].time and
+                        i < (track.frames.len - 1) and
+                        self.current_time < track.frames[i + 1].time)
+                    {
+                        curr_index = i;
+                        break;
+                    }
+                }
+
+                // Between last and first frames
+                if (curr_index == inf) {
+                    curr_index = track.frames.len - 1;
+                }
+
+                const curr_frame = track.frames[curr_index];
+
+                // Between last and first frame, and NOT interpolating between them.
+                if (curr_index == track.frames.len and !track.wrap_interpolation) {
+                    track.field.* = curr_frame.value;
+                    return;
+                }
+
+                // Ease between current and next frame
+                const next_frame = track.frames[(curr_index + 1) % track.frames.len];
+
+                const time_between_frames = blk: {
+                    if (curr_index == track.frames.len) {
+                        break :blk self.duration - curr_frame.time + next_frame.time;
+                    }
+                    break :blk next_frame.time - curr_frame.time;
+                };
+
+                const completion: f32 = (self.current_time - curr_frame.time) / time_between_frames;
+                const eased_value = track.ease(
+                    curr_frame.value,
+                    next_frame.value,
+                    completion,
+                );
+
+                track.field.* = eased_value;
             }
-        }
-
-        // Between last and first frames
-        if (curr_index == inf) {
-            curr_index = track.frames.len - 1;
-        }
-
-        const curr_frame = track.frames[curr_index];
-
-        // Between last and first frame, and NOT interpolating between them.
-        if (curr_index == track.frames.len and !track.wrap_interpolation) {
-            track.field.* = curr_frame.value;
-            return;
-        }
-
-        // Ease between current and next frame
-        const next_frame = track.frames[(curr_index + 1) % track.frames.len];
-
-        const time_between_frames = blk: {
-            if (curr_index == track.frames.len) {
-                break :blk self.duration - curr_frame.time + next_frame.time;
-            }
-            break :blk next_frame.time - curr_frame.time;
-        };
-
-        const completion: f32 = (self.current_time - curr_frame.time) / time_between_frames;
-        const eased_value = track.ease(
-            curr_frame.value,
-            next_frame.value,
-            completion,
-        );
-
-        track.field.* = eased_value;
+        }.foo;
     }
 };
 

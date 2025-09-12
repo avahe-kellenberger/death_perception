@@ -8,216 +8,88 @@ const sdl = @import("sdl3");
 const ui = @import("./lib/component.zig");
 const UIComponent = ui.Component;
 
+const Color = @import("../color.zig").Color;
 const Input = @import("../input.zig");
+const Game = @import("../game.zig");
 
 var root: ?UIComponent = null;
-var fit: bool = false;
 
 pub fn init(alloc: Allocator) void {
     deinit();
 
-    var top_left = UIComponent.init(alloc);
-    top_left.setMarginInsets(.{ .right = 50 });
-    top_left.setWidth(200);
-    top_left.setHeight(200);
-    top_left.background_color = .{
-        .r = 255,
-    };
-    top_left.content = .{
-        .text = .{
-            .content = .borrow("Top left"),
-            .align_h = .start,
-            .align_v = .start,
-            .fit = fit,
-        },
-    };
+    var background = UIComponent.init(alloc);
+    background.background_color = .{ .r = 100 };
+    // TODO use tiled content
 
-    var top_center = UIComponent.init(alloc);
-    top_center.setMarginInsets(.{ .right = 50 });
-    top_center.setWidth(200);
-    top_center.setHeight(200);
-    top_center.background_color = .{
-        .g = 255,
-    };
-    top_center.content = .{
+    var foreground = UIComponent.init(alloc);
+    foreground.setHorizontalAlignment(.center);
+    foreground.setPadding(50);
+
+    var title = UIComponent.init(alloc);
+    title.setHeight(200);
+    title.content = .{
         .text = .{
-            .content = .borrow("Top center"),
+            .content = .borrow("Death Perception"),
             .align_h = .center,
-            .align_v = .start,
-            .fit = fit,
-        },
-    };
-
-    var top_right = UIComponent.init(alloc);
-    top_right.setWidth(200);
-    top_right.setHeight(200);
-    top_right.background_color = .{
-        .r = 255,
-    };
-    top_right.content = .{
-        .text = .{
-            .content = .borrow("Top right"),
-            .align_h = .end,
-            .align_v = .start,
-            .fit = fit,
-        },
-    };
-
-    var center_left = UIComponent.init(alloc);
-    center_left.setMarginInsets(.{ .right = 50 });
-    center_left.setWidth(200);
-    center_left.setHeight(200);
-    center_left.background_color = .{
-        .g = 255,
-    };
-    center_left.content = .{
-        .text = .{
-            .content = .borrow("Center left"),
-            .align_h = .start,
             .align_v = .center,
-            .fit = fit,
+            .font = .{
+                .size = 150,
+                .outline = .{
+                    .color = .black,
+                    .size = 4,
+                    .align_h = .center,
+                    .align_v = .center,
+                },
+            },
+            .color = .white,
         },
     };
+    foreground.add(title);
 
-    var center_center = UIComponent.init(alloc);
-    center_center.setMarginInsets(.{ .right = 50 });
-    center_center.setPadding(10);
-    center_center.setWidth(200);
-    center_center.setHeight(200);
-    center_center.background_color = .{
-        .r = 255,
-    };
-    center_center.content = .{
-        .image = .{
-            .file_path = "./assets/images/player.png",
-            .align_h = .start,
-            .align_v = .center,
-            .fit = .none,
-            .scale = 6.0,
-        },
-    };
-    center_center.enableInput();
-    center_center.on_mouse_enter = .{
+    var menu = UIComponent.init(alloc);
+    menu.setStackDirection(.vertical);
+    menu.setMargin(100);
+    menu.setWidth(250);
+
+    var start_button = createMenuButton(alloc, "Start");
+    start_button.on_mouse_button = .{
         .context = undefined,
         .handler = struct {
-            fn handler(comp: *UIComponent, _: sdl.events.MouseMotion, _: *anyopaque) void {
-                comp.background_color = .{ .b = 255 };
+            fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: *anyopaque) void {
+                // TODO should animate going into the door in the background
             }
         }.handler,
     };
-    center_center.on_mouse_exit = .{
+    menu.add(start_button);
+
+    var settings_button = createMenuButton(alloc, "Settings");
+    settings_button.on_mouse_button = .{
         .context = undefined,
         .handler = struct {
-            fn handler(comp: *UIComponent, _: sdl.events.MouseMotion, _: *anyopaque) void {
-                comp.background_color = .{ .r = 255 };
+            fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: *anyopaque) void {
+                // TODO display main menu settings
             }
         }.handler,
     };
+    menu.add(settings_button);
 
-    var center_right = UIComponent.init(alloc);
-    center_right.setWidth(200);
-    center_right.setHeight(200);
-    center_right.background_color = .{
-        .g = 255,
+    var quit_button = createMenuButton(alloc, "Quit");
+    quit_button.on_mouse_button = .{
+        .context = undefined,
+        .handler = struct {
+            fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: *anyopaque) void {
+                Game.state = .quit;
+            }
+        }.handler,
     };
-    center_right.content = .{
-        .text = .{
-            .content = .borrow("Center right"),
-            .align_h = .end,
-            .align_v = .center,
-            .fit = fit,
-        },
-    };
+    menu.add(quit_button);
 
-    var bottom_left = UIComponent.init(alloc);
-    bottom_left.setMarginInsets(.{ .right = 50 });
-    bottom_left.setWidth(200);
-    bottom_left.setHeight(200);
-    bottom_left.background_color = .{
-        .r = 255,
-    };
-    bottom_left.content = .{
-        .text = .{
-            .content = .borrow("Bottom left"),
-            .align_h = .start,
-            .align_v = .end,
-            .fit = fit,
-        },
-    };
-
-    var bottom_center = UIComponent.init(alloc);
-    bottom_center.setMarginInsets(.{ .right = 50 });
-    bottom_center.setWidth(200);
-    bottom_center.setHeight(200);
-    bottom_center.background_color = .{
-        .g = 255,
-    };
-    bottom_center.content = .{
-        .text = .{
-            .content = .borrow("Bottom center"),
-            .align_h = .center,
-            .align_v = .end,
-            .fit = fit,
-        },
-    };
-
-    var bottom_right = UIComponent.init(alloc);
-    bottom_right.setWidth(200);
-    bottom_right.setHeight(200);
-    bottom_right.background_color = .{
-        .r = 255,
-    };
-    bottom_right.content = .{
-        .text = .{
-            .content = .borrow("Bottom right"),
-            .align_h = .end,
-            .align_v = .end,
-            .fit = fit,
-        },
-    };
-
-    var top_row = UIComponent.init(alloc);
-    top_row.setStackDirection(.horizontal);
-    top_row.setHorizontalAlignment(.center);
-    top_row.setMarginInsets(.{ .bottom = 50 });
-    top_row.setHeight(200);
-    top_row.add(top_left);
-    top_row.add(top_center);
-    top_row.add(top_right);
-
-    var center_row = UIComponent.init(alloc);
-    center_row.setStackDirection(.horizontal);
-    center_row.setHorizontalAlignment(.center);
-    center_row.setMarginInsets(.{ .bottom = 50 });
-    center_row.setHeight(200);
-    center_row.add(center_left);
-    center_row.add(center_center);
-    center_row.add(center_right);
-
-    var bottom_row = UIComponent.init(alloc);
-    bottom_row.setStackDirection(.horizontal);
-    bottom_row.setHorizontalAlignment(.center);
-    bottom_row.setHeight(200);
-    bottom_row.add(bottom_left);
-    bottom_row.add(bottom_center);
-    bottom_row.add(bottom_right);
-
-    var box = UIComponent.init(alloc);
-    box.setStackDirection(.vertical);
-    box.setHorizontalAlignment(.center);
-    box.setVerticalAlignment(.center);
-    box.background_color = .{
-        .r = 50,
-        .g = 50,
-        .b = 50,
-    };
-    box.add(top_row);
-    box.add(center_row);
-    box.add(bottom_row);
+    foreground.add(menu);
 
     var r = UIComponent.init(alloc);
-    r.setPadding(50);
-    r.add(box);
+    r.setStackDirection(.overlap);
+    r.add(background);
+    r.add(foreground);
 
     root = r;
 }
@@ -238,17 +110,46 @@ pub fn input(event: sdl.events.Event) void {
 pub fn update(frame_delay: f32) void {
     // TODO
     _ = frame_delay;
-
-    if (root) |r| {
-        if (Input.isKeyPressed(.f)) {
-            fit = !fit;
-            init(r._alloc);
-        }
-    }
 }
 
 pub fn render(width: f32, height: f32) void {
     if (root) |*r| {
         ui.render(r, width, height);
     }
+}
+
+fn createMenuButton(alloc: Allocator, comptime text: []const u8) UIComponent {
+    const button_color: Color = .{ .r = 11, .g = 50, .b = 69 };
+    var button = UIComponent.init(alloc);
+    button.setHeight(60);
+    button.setMarginInsets(.{ .bottom = 25 });
+    button.background_color = button_color;
+    button.content = .{
+        .text = .{
+            .content = .borrow(text),
+            .align_h = .center,
+            .align_v = .center,
+            .color = .white,
+        },
+    };
+    button.enableInput();
+    button.on_mouse_enter = .{
+        .context = undefined,
+        .handler = struct {
+            fn handler(comp: *UIComponent, _: sdl.events.MouseMotion, _: *anyopaque) void {
+                var hover_color = button_color;
+                hover_color.a = 100;
+                comp.background_color = hover_color;
+            }
+        }.handler,
+    };
+    button.on_mouse_exit = .{
+        .context = undefined,
+        .handler = struct {
+            fn handler(comp: *UIComponent, _: sdl.events.MouseMotion, _: *anyopaque) void {
+                comp.background_color = button_color;
+            }
+        }.handler,
+    };
+    return button;
 }

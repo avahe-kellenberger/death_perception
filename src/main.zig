@@ -70,9 +70,7 @@ pub fn main() !void {
     );
     defer Game.deinit();
 
-    var running = true;
-
-    while (running) {
+    while (Game.state != .quit) {
         // Delay to limit the FPS
         const dt = fps_capper.delay();
         // std.log.err("{}", .{dt});
@@ -86,7 +84,7 @@ pub fn main() !void {
                     try Input.update(event);
                     Game.input(event);
                 },
-                .quit, .terminating => running = false,
+                .quit, .terminating => Game.state = .quit,
                 .window_pixel_size_changed => |e| {
                     Game.camera.setSize(@floatFromInt(e.width), @floatFromInt(e.height));
                 },
@@ -97,7 +95,7 @@ pub fn main() !void {
             }
         }
 
-        if (!running or Input.isKeyPressed(.escape)) break;
+        if (Game.state == .quit or Input.isKeyPressed(.escape)) break;
 
         Game.update(dt);
         Game.render();

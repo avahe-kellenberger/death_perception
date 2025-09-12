@@ -4,47 +4,46 @@ const Allocator = std.mem.Allocator;
 const sdl = @import("sdl3");
 const Texture = sdl.render.Texture;
 const FRect = sdl.rect.FRect;
+
 const Size = @import("size.zig").Size;
 
 pub const Spritesheet = struct {
     pub const Self = @This();
 
-    alloc: Allocator,
     sheet: Texture,
-    width: usize,
-    height: usize,
-    sprites: []FRect,
-    sprite_size: Size(usize),
+    columns: u16,
+    rows: u16,
+    sprite_size: Size(f32),
 
-    pub fn init(alloc: Allocator, sheet: Texture, w: usize, h: usize) Spritesheet {
-        var result: Spritesheet = .{
-            .alloc = alloc,
+    pub fn init(sheet: Texture, columns: u16, rows: u16) Self {
+        std.debug.assert(columns > 0);
+        std.debug.assert(rows > 0);
+        return .{
             .sheet = sheet,
-            .width = w,
-            .height = h,
-            .sprites = alloc.alloc(FRect, w * h) catch unreachable,
+            .columns = columns,
+            .rows = rows,
             .sprite_size = .{
-                .w = @divExact(sheet.getWidth(), w),
-                .h = @divExact(sheet.getHeight(), h),
+                .w = @floatFromInt(@divExact(sheet.getWidth(), columns)),
+                .h = @floatFromInt(@divExact(sheet.getHeight(), rows)),
             },
         };
+    }
 
-        for (0..h) |y| for (0..w) |x| {
-            result.sprites[x + y * w] = .{
-                .x = @as(f32, @floatFromInt(x * result.sprite_size.w)),
-                .y = @as(f32, @floatFromInt(y * result.sprite_size.h)),
-                .w = @floatFromInt(result.sprite_size.w),
-                .h = @floatFromInt(result.sprite_size.h),
-            };
+    pub fn xy(self: *const Self, x: u16, y: u16) FRect {
+        std.debug.assert(x < self.columns);
+        std.debug.assert(y < self.rows);
+        return .{
+            .x = @as(f32, @floatFromInt(x)) * self.sprite_size.w,
+            .y = @as(f32, @floatFromInt(y)) * self.sprite_size.h,
+            .w = self.sprite_size.w,
+            .h = self.sprite_size.h,
         };
-        return result;
     }
 
-    pub fn deinit(self: *Self) void {
-        self.alloc.free(self.sprites);
-    }
-
-    pub fn get(self: *Self, x: usize, y: usize) FRect {
-        return self.sprites[x + y * self.width];
+    pub fn index(self: *const Self, idx: u32) FRect {
+        return self.xy(
+            @intCast(idx % self.columns),
+            @intCast(idx / self.columns),
+        );
     }
 };

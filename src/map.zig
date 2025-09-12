@@ -22,8 +22,8 @@ const CollisionShape = @import("math/collisionshape.zig").CollisionShape;
 const Color = @import("color.zig").Color;
 
 pub const Tile = struct {
-    floor_image_index: isize = -1,
-    wall_image_index: isize = -1,
+    floor_image_index: i32 = -1,
+    wall_image_index: i32 = -1,
     neighbor_bit_sum: u8 = 0,
     is_wall: bool = false,
 };
@@ -86,8 +86,7 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
         }
 
         pub fn deinit(self: *Self) void {
-            self.floor_tiles_sheet.deinit();
-            self.wall_tiles_sheet.deinit();
+            self.alloc.destroy(self.tiles);
         }
 
         fn processCellularAutoma(self: *Self) void {
@@ -304,7 +303,7 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 var iter = self.tiles.window(window);
                 while (iter.next()) |e| {
                     if (e.t.floor_image_index >= 0) {
-                        const sprite_rect = self.floor_tiles_sheet.sprites[@intCast(e.t.floor_image_index)];
+                        const sprite_rect = self.floor_tiles_sheet.index(@intCast(e.t.floor_image_index));
                         Game.renderTexture(self.floor_tiles_sheet.sheet, sprite_rect, .{
                             .x = @as(f32, @floatFromInt(e.x)) * tile_size,
                             .y = @as(f32, @floatFromInt(e.y)) * tile_size,
@@ -320,7 +319,7 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 var iter = self.tiles.window(window);
                 while (iter.next()) |e| {
                     if (e.t.wall_image_index >= 0) {
-                        const sprite_rect = self.wall_tiles_sheet.sprites[@intCast(e.t.wall_image_index)];
+                        const sprite_rect = self.wall_tiles_sheet.index(@intCast(e.t.wall_image_index));
                         Game.renderTexture(self.wall_tiles_sheet.sheet, sprite_rect, .{
                             .x = @as(f32, @floatFromInt(e.x)) * tile_size,
                             .y = @as(f32, @floatFromInt(e.y)) * tile_size,

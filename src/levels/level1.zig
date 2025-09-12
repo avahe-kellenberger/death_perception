@@ -44,8 +44,8 @@ pub const Level1 = struct {
         floor_tiles_image = Game.loadTexture("./assets/images/floor_tiles.png", .nearest);
         wall_tiles_image = Game.loadTexture("./assets/images/wall_tiles.png", .nearest);
 
-        const floor_sheet = Spritesheet.init(alloc, floor_tiles_image, 2, 3);
-        const wall_sheet = Spritesheet.init(alloc, wall_tiles_image, 3, 5);
+        const floor_sheet = Spritesheet.init(floor_tiles_image, 2, 3);
+        const wall_sheet = Spritesheet.init(wall_tiles_image, 3, 5);
 
         var player = Player.init();
         player.loc.x = Map.tile_size * 70;

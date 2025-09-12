@@ -10,6 +10,7 @@ pub const Color = struct {
 
     pub const transparent: Color = .{ .a = 0 };
     pub const black: Color = .{};
+    pub const white: Color = .{ .r = 255, .g = 255, .b = 255 };
     pub const red: Color = .{ .r = 255 };
     pub const green: Color = .{ .g = 255 };
     pub const blue: Color = .{ .b = 255 };

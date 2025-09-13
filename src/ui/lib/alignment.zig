@@ -82,13 +82,13 @@ fn alignStartMainAxis(comp: *Component, comptime axis: StackDirection) void {
         const child_pixel_len = pixelLen(comp, child, axis);
         const child_len = if (child_pixel_len > 0) child_pixel_len else max_child_len;
 
-        child_start += startMargin(child, axis);
+        const child_sm = startMargin(child, axis);
+        child_start += child_sm;
 
         if (prev_child) |pc| {
-            const sm = startMargin(pc, axis);
             const em = endMargin(pc, axis);
-            if (em > sm) {
-                child_start += em - sm;
+            if (em > child_sm) {
+                child_start += em - child_sm;
             }
         }
 
@@ -142,13 +142,13 @@ fn alignCenterMainAxis(comp: *Component, comptime axis: StackDirection) void {
         const child_pixel_len = pixelLen(comp, child, axis);
         const child_len = if (child_pixel_len > 0) child_pixel_len else max_child_len;
 
-        total_children_len += child_len + startMargin(child, axis);
+        const child_sm = startMargin(child, axis);
+        total_children_len += child_len + child_sm;
 
         if (prev_child) |pc| {
-            const sm = startMargin(pc, axis);
             const em = endMargin(pc, axis);
-            if (em > sm) {
-                total_children_len += em - sm;
+            if (em > child_sm) {
+                total_children_len += em - child_sm;
             }
         }
 
@@ -189,13 +189,13 @@ fn alignCenterMainAxis(comp: *Component, comptime axis: StackDirection) void {
         const child_pixel_len = pixelLen(comp, child, axis);
         const child_len = if (child_pixel_len > 0) child_pixel_len else max_child_len;
 
-        child_start += startMargin(child, axis);
+        const child_sm = startMargin(child, axis);
+        child_start += child_sm;
 
         if (prev_child) |pc| {
-            const sm = startMargin(pc, axis);
             const em = endMargin(pc, axis);
-            if (em > sm) {
-                child_start += em - sm;
+            if (em > child_sm) {
+                child_start += em - child_sm;
             }
         }
 
@@ -255,13 +255,13 @@ fn alignEndMainAxis(comp: *Component, comptime axis: StackDirection) void {
         const child_pixel_len = pixelLen(comp, child, axis);
         const child_len = if (child_pixel_len > 0) child_pixel_len else max_child_len;
 
-        total_children_len += child_len + startMargin(child, axis);
+        const child_sm = startMargin(child, axis);
+        total_children_len += child_len + child_sm;
 
         if (prev_child) |pc| {
-            const sm = startMargin(pc, axis);
             const em = endMargin(pc, axis);
-            if (em > sm) {
-                total_children_len += em - sm;
+            if (em > child_sm) {
+                total_children_len += em - child_sm;
             }
         }
 
@@ -285,17 +285,17 @@ fn alignEndMainAxis(comp: *Component, comptime axis: StackDirection) void {
         const child_pixel_len = pixelLen(comp, child, axis);
         const child_len = if (child_pixel_len > 0) child_pixel_len else max_child_len;
 
-        child_start += startMargin(child, axis);
+        const child_sm = startMargin(child, axis);
+        child_start += child_sm;
 
         layout(child, axis, child_start, child_len);
 
         child_start += child_len;
 
         if (prev_child) |pc| {
-            const sm = startMargin(pc, axis);
             const em = endMargin(pc, axis);
-            if (em > sm) {
-                child_start += em - sm;
+            if (em > child_sm) {
+                child_start += em - child_sm;
             }
         }
 

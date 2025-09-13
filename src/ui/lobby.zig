@@ -13,9 +13,11 @@ const UIComponent = ui.Component;
 
 const Color = @import("../color.zig").Color;
 const Input = @import("../input.zig");
-const Server = @import("../net/server.zig");
 const t = @import("./lib/content/sprite.zig").SpriteCoord.xy;
 const Spritesheet = @import("../spritesheet.zig").Spritesheet;
+
+const Server = @import("../net/server.zig");
+const NetworkSession = @import("../net/session.zig");
 
 var root: ?UIComponent = null;
 
@@ -118,9 +120,10 @@ pub fn init() void {
                     if (Server.isListening()) {
                         Server.stop();
                         comp.content.text.setStr("Start Multiplayer");
-                    } else {
-                        Server.start();
+                    } else if (Server.start()) {
                         comp.content.text.setStr("Stop Multiplayer");
+                    } else {
+                        comp.content.text.setStr("Uh oh!");
                     }
                 }
             }

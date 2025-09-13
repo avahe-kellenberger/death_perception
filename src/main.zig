@@ -98,8 +98,12 @@ pub fn main() !void {
 
         if (Game.state == .quit or Input.isKeyPressed(.escape)) break;
 
-        Game.update(dt);
-        Game.render();
+        {
+            Game.mutex.lock();
+            defer Game.mutex.unlock();
+            Game.update(dt);
+            Game.render();
+        }
 
         try renderer.present();
     }

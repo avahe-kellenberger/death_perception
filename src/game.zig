@@ -10,6 +10,8 @@ const FPoint = sdl.rect.FPoint;
 const Camera = @import("camera.zig").Camera;
 const Input = @import("input.zig");
 
+const syncToClients = @import("./net/client.zig").syncToClients;
+
 const ui = @import("./ui/lib/component.zig");
 const TestUI = @import("./ui/test.zig");
 const MainMenu = @import("./ui/main_menu.zig");
@@ -33,6 +35,7 @@ pub const GameState = enum {
 };
 
 pub var alloc: Allocator = undefined;
+pub var mutex: std.Thread.Mutex = .{};
 pub var state: GameState = .main_menu;
 pub var renderer: Renderer = undefined;
 pub var camera: Camera = undefined;
@@ -104,6 +107,9 @@ pub fn update(frame_delay: f32) void {
         },
         .quit => {},
     }
+
+    // Sync game state to connected clients
+    syncToClients();
 }
 
 pub fn render() void {

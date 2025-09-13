@@ -363,7 +363,7 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                         //     ) catch unreachable;
                         //
                         //     Game.setRenderColor(Color.green);
-                        //     Game.renderDebugText(.{
+                        //     Game.renderDebugTextInGame(.{
                         //         .x = @as(f32, @floatFromInt(e.x)) * tile_size + tile_size * 0.5,
                         //         .y = @as(f32, @floatFromInt(e.y)) * tile_size + tile_size * 0.5,
                         //     }, str);

@@ -73,8 +73,7 @@ pub fn main() !void {
     while (Game.state != .quit) {
         // Delay to limit the FPS
         const dt = fps_capper.delay();
-        // std.log.err("{}", .{dt});
-        // std.log.err("Real FPS: {}", .{fps_capper.getObservedFps()});
+        Game.observed_fps = fps_capper.getObservedFps();
 
         Input.resetFrameSpecificState();
         while (sdl.events.poll()) |event| {

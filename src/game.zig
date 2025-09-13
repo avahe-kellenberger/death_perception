@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 
 const sdl = @import("sdl3");
@@ -31,13 +32,14 @@ pub const GameState = enum {
     test_ui,
 };
 
+pub var observed_fps: f32 = 0;
+
 pub var alloc: Allocator = undefined;
 pub var state: GameState = .main_menu;
 pub var renderer: Renderer = undefined;
 pub var camera: Camera = undefined;
 pub var bg_color: sdl.pixels.Color = .{};
-
-pub const tile_size: f32 = 16.0 * 2.0;
+pub const tile_size: f32 = 16.0;
 
 var level: Level1 = undefined;
 
@@ -146,6 +148,15 @@ pub fn render() void {
         },
         .quit => {},
     }
+
+    if (builtin.mode == .Debug) {
+        var buf: [1 + std.fmt.count("{d}", .{std.math.maxInt(i32)})]u8 = undefined;
+        const str = std.fmt.bufPrintZ(&buf, "{d}", .{
+            @as(i32, @intFromFloat(@round(observed_fps))),
+        }) catch unreachable;
+        setRenderColor(Color.green);
+        renderDebugText(.init(4, 4), str);
+    }
 }
 
 pub fn setRenderColor(color: Color) void {
@@ -207,5 +218,9 @@ pub fn fillRect(dest: FRect, color: Color) void {
 }
 
 pub fn renderDebugText(top_left: Vector, str: [:0]const u8) void {
+    renderer.renderDebugText(@bitCast(top_left), str) catch unreachable;
+}
+
+pub fn renderDebugTextInGame(top_left: Vector, str: [:0]const u8) void {
     renderer.renderDebugText(@bitCast(top_left.subtract(camera.viewportLoc())), str) catch unreachable;
 }

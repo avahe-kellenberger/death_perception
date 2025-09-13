@@ -42,6 +42,7 @@ pub const Level1 = struct {
     pub fn init() Level1 {
         // Map floor color so we can ignore drawing "empty" tiles
         Game.bg_color = .{ .r = 139, .g = 155, .b = 180, .a = 255 };
+        Game.camera.zoom(0.7);
 
         floor_tiles_image = Game.loadTexture("./assets/images/floor_tiles.png", .nearest);
         wall_tiles_image = Game.loadTexture("./assets/images/wall_tiles.png", .nearest);
@@ -93,7 +94,7 @@ pub const Level1 = struct {
         var iter = self.map.tiles.window(movement_area);
 
         while (iter.next()) |t| {
-            if (t.t.kind != .wall) continue;
+            if (t.t.kind != .wall and t.t.kind != .corner) continue;
 
             const tile_loc = vector(
                 @as(f32, @floatFromInt(t.x)) * Map.tile_size,

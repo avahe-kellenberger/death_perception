@@ -30,6 +30,10 @@ pub const Camera = struct {
         return cam;
     }
 
+    pub fn viewportLoc(self: *Self) Vector {
+        return .{ .x = self.viewport.x, .y = self.viewport.y };
+    }
+
     pub fn getScale(self: *Self) ?f32 {
         const relative_z = DEFAULT_Z - self._z;
         if (relative_z <= 0) return null;

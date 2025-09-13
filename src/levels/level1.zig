@@ -102,7 +102,7 @@ pub const Level1 = struct {
             }
         }
 
-        Game.camera.centerOnPoint(self.player.loc);
+        Game.camera.centerOnPoint(self.player.loc.add(self.player.sprite_offset));
 
         if (Input.getButtonState(.left) == .just_pressed) {
             self.raycast_start_loc = Game.camera.screenToWorld(Input.mouse.loc).round();

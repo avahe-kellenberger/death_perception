@@ -36,8 +36,7 @@ pub const Level1 = struct {
     map: Map,
 
     // NOTE: Testing code below, can remove later
-    raycast_start_loc: ?Vector = null,
-    raycast_end_loc: ?Vector = null,
+    raycast_hit_data: ?TileData = null,
 
     pub fn init() Level1 {
         // Map floor color so we can ignore drawing "empty" tiles
@@ -91,8 +90,8 @@ pub const Level1 = struct {
             self.player.loc,
             self.player.loc.subtract(start_loc),
         );
-        var iter = self.map.tiles.window(movement_area);
 
+        var iter = self.map.tiles.window(movement_area);
         while (iter.next()) |t| {
             if (t.t.kind != .wall and t.t.kind != .corner) continue;
 
@@ -120,44 +119,40 @@ pub const Level1 = struct {
         Game.camera.centerOnPoint(self.player.loc.add(self.player.sprite_offset));
 
         if (Input.getButtonState(.left) == .just_pressed) {
-            self.raycast_start_loc = Game.camera.screenToWorld(Input.mouse.loc).round();
-        } else if (Input.getButtonState(.right) == .just_pressed) {
-            self.raycast_end_loc = Game.camera.screenToWorld(Input.mouse.loc).round();
+            self.raycast_hit_data = null;
+
+            const raycast_start_loc = self.player.loc.round();
+            const clicked_loc = Game.camera.screenToWorld(Input.mouse.loc);
+            const raycast_end_loc = raycast_start_loc.add(
+                clicked_loc.subtract(raycast_start_loc).normalize().scale(
+                    Map.tile_diagonal_len * @max(map_size.x, map_size.y),
+                ),
+            );
+            var raycast_iter = self.map.raycast(raycast_start_loc, raycast_end_loc);
+            while (raycast_iter.next()) |data| {
+                if (data.tile.kind == .wall or data.tile.kind == .corner) {
+                    self.raycast_hit_data = data;
+                    break;
+                }
+            }
         }
     }
 
     pub fn render(self: *Self) void {
         self.map.render();
 
-        if (self.raycast_start_loc) |start| if (self.raycast_end_loc) |end| {
-            var iter = self.map.raycast(start, end);
-            while (iter.next()) |t| {
-                const rect: FRect = .{
-                    .x = @as(f32, @floatFromInt(t.x)) * Map.tile_size,
-                    .y = @as(f32, @floatFromInt(t.y)) * Map.tile_size,
+        if (self.raycast_hit_data) |data| {
+            Game.fillRect(
+                .{
+                    .x = @as(f32, @floatFromInt(data.tile_x)) * Map.tile_size,
+                    .y = @as(f32, @floatFromInt(data.tile_y)) * Map.tile_size,
                     .w = Map.tile_size,
                     .h = Map.tile_size,
-                };
-                Game.fillRect(rect, Color.blue);
-            }
-        };
-
-        if (self.raycast_start_loc) |start| if (self.raycast_end_loc) |end| {
-            Game.renderer.setDrawColor(Color.black.sdl()) catch unreachable;
-            Game.renderer.renderLine(
-                .{ .x = start.x - Game.camera.viewport.x, .y = start.y - Game.camera.viewport.y },
-                .{ .x = end.x - Game.camera.viewport.x, .y = end.y - Game.camera.viewport.y },
-            ) catch unreachable;
-        };
-
-        if (self.raycast_start_loc) |start| {
-            Game.fillRect(.{ .x = start.x, .y = start.y, .w = 1, .h = 1 }, Color.green);
+                },
+                .{ .r = 255, .a = 80 },
+            );
+            Game.fillRect(.{ .x = data.x, .y = data.y, .w = 1, .h = 1 }, Color.green);
         }
-
-        if (self.raycast_end_loc) |end| {
-            Game.fillRect(.{ .x = end.x, .y = end.y, .w = 1, .h = 1 }, Color.red);
-        }
-
         self.player.render();
     }
 

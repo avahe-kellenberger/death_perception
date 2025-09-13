@@ -174,8 +174,23 @@ pub fn renderTexture(t: Texture, src: ?FRect, dest: FRect) void {
         var r = dest;
         r.x -= camera.viewport.x;
         r.y -= camera.viewport.y;
-
         renderer.renderTexture(t, src, r) catch unreachable;
+    }
+}
+
+pub fn renderTextureRotated(
+    t: Texture,
+    src: ?FRect,
+    dest: FRect,
+    angle: f32,
+    center: Vector,
+    flip: sdl.surface.FlipMode,
+) void {
+    if (camera.intersects(dest)) {
+        var r = dest;
+        r.x -= camera.viewport.x;
+        r.y -= camera.viewport.y;
+        renderer.renderTextureRotated(t, src, r, angle, @bitCast(center), flip) catch unreachable;
     }
 }
 

@@ -31,14 +31,17 @@ pub const Tile = struct {
 
 pub const TileData = struct {
     tile: *Tile,
-    x: usize,
-    y: usize,
+    tile_x: usize,
+    tile_y: usize,
+    x: f32,
+    y: f32,
 };
 
 pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type {
     return struct {
         pub const Self = @This();
         pub const tile_size: f32 = _tile_size;
+        pub const tile_diagonal_len: f32 = _tile_size * std.math.sqrt(2.0);
 
         floor_tiles_sheet: Spritesheet,
         wall_tiles_sheet: Spritesheet,
@@ -443,8 +446,14 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 };
             }
 
-            fn getTileData(iter: *RaycastIterator, x: usize, y: usize) TileData {
-                return .{ .x = x, .y = y, .tile = iter.map.tiles.get(x, y) };
+            fn getTileData(iter: *RaycastIterator, tile_x: usize, tile_y: usize) TileData {
+                return .{
+                    .x = iter.current_loc.x,
+                    .y = iter.current_loc.y,
+                    .tile_x = tile_x,
+                    .tile_y = tile_y,
+                    .tile = iter.map.tiles.get(tile_x, tile_y),
+                };
             }
 
             fn dispToTile(tile_coord: usize, loc: f32, sign: isize) f32 {
@@ -455,39 +464,45 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             fn determineTile(map: *Self, current_loc: Vector) TileData {
                 const tile_x = @as(usize, @intFromFloat(@floor(current_loc.x / tile_size)));
                 const tile_y = @as(usize, @intFromFloat(@floor(current_loc.y / tile_size)));
-                return .{ .x = tile_x, .y = tile_y, .tile = map.tiles.get(tile_x, tile_y) };
+                return .{
+                    .x = current_loc.x,
+                    .y = current_loc.y,
+                    .tile_x = tile_x,
+                    .tile_y = tile_y,
+                    .tile = map.tiles.get(tile_x, tile_y),
+                };
             }
 
             pub fn next(iter: *RaycastIterator) ?TileData {
                 const return_tile = iter.next_tile;
                 if (return_tile) |rt| {
-                    const disp_x = dispToTile(rt.x, iter.current_loc.x, iter.sign_x);
-                    const disp_y = dispToTile(rt.y, iter.current_loc.y, iter.sign_y);
+                    const disp_x = dispToTile(rt.tile_x, iter.current_loc.x, iter.sign_x);
+                    const disp_y = dispToTile(rt.tile_y, iter.current_loc.y, iter.sign_y);
                     const slope_diff = @abs(disp_y) - @abs(disp_x * iter.slope);
                     if (slope_diff > 0) {
                         iter.current_loc.x += disp_x;
                         iter.current_loc.y += disp_x * iter.slope;
-                        const new_x = @as(isize, @intCast(rt.x)) + iter.sign_x;
+                        const new_x = @as(isize, @intCast(rt.tile_x)) + iter.sign_x;
                         if (new_x < 0 or new_x >= width) {
                             iter.next_tile = null;
                         } else {
-                            iter.next_tile = iter.getTileData(@as(usize, @intCast(new_x)), rt.y);
+                            iter.next_tile = iter.getTileData(@as(usize, @intCast(new_x)), rt.tile_y);
                         }
                     } else if (slope_diff < 0) {
                         iter.current_loc.x += disp_y / iter.slope;
                         iter.current_loc.y += disp_y;
-                        const new_y = @as(isize, @intCast(rt.y)) + iter.sign_y;
+                        const new_y = @as(isize, @intCast(rt.tile_y)) + iter.sign_y;
                         if (new_y < 0 or new_y >= height) {
                             iter.next_tile = null;
                         } else {
-                            iter.next_tile = iter.getTileData(rt.x, @as(usize, @intCast(new_y)));
+                            iter.next_tile = iter.getTileData(rt.tile_x, @as(usize, @intCast(new_y)));
                         }
                     } else {
                         // Going through intersection x and y at the same time
                         iter.current_loc.x += disp_x;
                         iter.current_loc.y += disp_y;
-                        const new_x = @as(isize, @intCast(rt.x)) + iter.sign_x;
-                        const new_y = @as(isize, @intCast(rt.y)) + iter.sign_y;
+                        const new_x = @as(isize, @intCast(rt.tile_x)) + iter.sign_x;
+                        const new_y = @as(isize, @intCast(rt.tile_y)) + iter.sign_y;
                         if (new_x < 0 or new_x >= width or new_y < 0 or new_y >= height) {
                             iter.next_tile = null;
                         } else {

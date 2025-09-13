@@ -5,7 +5,6 @@ const sdl = @import("sdl3");
 const Renderer = sdl.render.Renderer;
 const Texture = sdl.render.Texture;
 const FRect = sdl.rect.FRect;
-const FPoint = sdl.rect.FPoint;
 
 const Camera = @import("camera.zig").Camera;
 const Input = @import("input.zig");
@@ -15,7 +14,7 @@ const TestUI = @import("./ui/test.zig");
 const MainMenu = @import("./ui/main_menu.zig");
 
 const Vector = @import("math/vector.zig").Vector(f32);
-
+const Color = @import("color.zig").Color;
 const Level1 = @import("./levels/level1.zig").Level1;
 
 pub const GameState = enum {
@@ -38,7 +37,7 @@ pub var renderer: Renderer = undefined;
 pub var camera: Camera = undefined;
 pub var bg_color: sdl.pixels.Color = .{};
 
-pub const tile_size: f32 = 16.0;
+pub const tile_size: f32 = 16.0 * 2.0;
 
 var level: Level1 = undefined;
 
@@ -149,6 +148,10 @@ pub fn render() void {
     }
 }
 
+pub fn setRenderColor(color: Color) void {
+    renderer.setDrawColor(color.sdl()) catch unreachable;
+}
+
 pub fn loadTexture(path: [:0]const u8, mode: sdl.surface.ScaleMode) Texture {
     const tex = sdl.image.loadTexture(renderer, path) catch unreachable;
     tex.setScaleMode(mode) catch unreachable;
@@ -192,13 +195,17 @@ pub fn renderTextureAffine(
     }
 }
 
-pub fn fillRect(dest: FRect, color: sdl.pixels.Color) void {
+pub fn fillRect(dest: FRect, color: Color) void {
     if (camera.intersects(dest)) if (camera.getScale()) |_| {
         var r = dest;
         r.x -= camera.viewport.x;
         r.y -= camera.viewport.y;
 
-        renderer.setDrawColor(color) catch unreachable;
+        renderer.setDrawColor(color.sdl()) catch unreachable;
         renderer.renderFillRect(r) catch unreachable;
     };
+}
+
+pub fn renderDebugText(top_left: Vector, str: [:0]const u8) void {
+    renderer.renderDebugText(@bitCast(top_left.subtract(camera.viewportLoc())), str) catch unreachable;
 }

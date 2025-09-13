@@ -111,11 +111,9 @@ pub const Level1 = struct {
                 tile_shape,
                 Vector.zero,
             )) |result| {
-                if (result.collision_owner_a) {
-                    self.player.loc = player_loc.add(result.invert().getMinTranslationVector().scale(0.5));
-                } else {
-                    self.player.loc = player_loc.add(result.getMinTranslationVector().scale(0.5));
-                }
+                var mtv = result.getMinTranslationVector();
+                if (result.collision_owner_a) mtv = mtv.negate();
+                self.player.loc = player_loc.add(mtv);
             }
         }
 

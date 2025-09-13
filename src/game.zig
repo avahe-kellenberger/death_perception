@@ -1,11 +1,11 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 
 const sdl = @import("sdl3");
 const Renderer = sdl.render.Renderer;
 const Texture = sdl.render.Texture;
 const FRect = sdl.rect.FRect;
-const FPoint = sdl.rect.FPoint;
 
 const Camera = @import("camera.zig").Camera;
 const Input = @import("input.zig");
@@ -15,7 +15,7 @@ const TestUI = @import("./ui/test.zig");
 const MainMenu = @import("./ui/main_menu.zig");
 
 const Vector = @import("math/vector.zig").Vector(f32);
-
+const Color = @import("color.zig").Color;
 const Level1 = @import("./levels/level1.zig").Level1;
 
 pub const GameState = enum {
@@ -32,12 +32,13 @@ pub const GameState = enum {
     test_ui,
 };
 
+pub var observed_fps: f32 = 0;
+
 pub var alloc: Allocator = undefined;
 pub var state: GameState = .main_menu;
 pub var renderer: Renderer = undefined;
 pub var camera: Camera = undefined;
 pub var bg_color: sdl.pixels.Color = .{};
-
 pub const tile_size: f32 = 16.0;
 
 var level: Level1 = undefined;
@@ -147,6 +148,19 @@ pub fn render() void {
         },
         .quit => {},
     }
+
+    if (builtin.mode == .Debug) {
+        var buf: [1 + std.fmt.count("{d}", .{std.math.maxInt(i32)})]u8 = undefined;
+        const str = std.fmt.bufPrintZ(&buf, "{d}", .{
+            @as(i32, @intFromFloat(@round(observed_fps))),
+        }) catch unreachable;
+        setRenderColor(Color.green);
+        renderDebugText(.init(4, 4), str);
+    }
+}
+
+pub fn setRenderColor(color: Color) void {
+    renderer.setDrawColor(color.sdl()) catch unreachable;
 }
 
 pub fn loadTexture(path: [:0]const u8, mode: sdl.surface.ScaleMode) Texture {
@@ -192,13 +206,21 @@ pub fn renderTextureAffine(
     }
 }
 
-pub fn fillRect(dest: FRect, color: sdl.pixels.Color) void {
+pub fn fillRect(dest: FRect, color: Color) void {
     if (camera.intersects(dest)) if (camera.getScale()) |_| {
         var r = dest;
         r.x -= camera.viewport.x;
         r.y -= camera.viewport.y;
 
-        renderer.setDrawColor(color) catch unreachable;
+        renderer.setDrawColor(color.sdl()) catch unreachable;
         renderer.renderFillRect(r) catch unreachable;
     };
+}
+
+pub fn renderDebugText(top_left: Vector, str: [:0]const u8) void {
+    renderer.renderDebugText(@bitCast(top_left), str) catch unreachable;
+}
+
+pub fn renderDebugTextInGame(top_left: Vector, str: [:0]const u8) void {
+    renderer.renderDebugText(@bitCast(top_left.subtract(camera.viewportLoc())), str) catch unreachable;
 }

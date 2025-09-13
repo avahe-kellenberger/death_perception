@@ -6,6 +6,7 @@ const Renderer = sdl.render.Renderer;
 const Texture = sdl.render.Texture;
 const vector_mod = @import("../math/vector.zig");
 const Vector = vector_mod.Vector(f32);
+const UVector = vector_mod.Vector(usize);
 const vector = vector_mod.vector;
 const FRect = sdl.rect.FRect;
 
@@ -17,10 +18,13 @@ const Input = @import("../input.zig");
 const Player = @import("../player.zig").Player;
 const Spritesheet = @import("../spritesheet.zig").Spritesheet;
 const CollisionShape = @import("../math/collisionshape.zig").CollisionShape;
+const rand = @import("../random.zig").rand;
 
 const TileData = @import("../map.zig").TileData;
 
-const Map = @import("../map.zig").Map(144, 144, Game.tile_size);
+const map_size: UVector = .init(144, 144);
+
+const Map = @import("../map.zig").Map(map_size.x, map_size.y, Game.tile_size);
 
 pub const Level1 = struct {
     pub const Self = @This();
@@ -38,6 +42,7 @@ pub const Level1 = struct {
     pub fn init() Level1 {
         // Map floor color so we can ignore drawing "empty" tiles
         Game.bg_color = .{ .r = 139, .g = 155, .b = 180, .a = 255 };
+        Game.camera.zoom(0.7);
 
         floor_tiles_image = Game.loadTexture("./assets/images/floor_tiles.png", .nearest);
         wall_tiles_image = Game.loadTexture("./assets/images/wall_tiles.png", .nearest);
@@ -46,13 +51,25 @@ pub const Level1 = struct {
         const wall_sheet = Spritesheet.init(wall_tiles_image, 3, 5);
 
         var player = Player.init();
-        player.loc.x = Map.tile_size * 70;
-        player.loc.y = Map.tile_size * 70;
 
-        return .{
+        const result: Level1 = .{
             .player = player,
             .map = .init(floor_sheet, wall_sheet, 47.0, 10),
         };
+
+        // Make sure the players spawns on the ground.
+        while (true) {
+            const tile_loc: UVector = .init(rand(usize, 0, map_size.x), rand(usize, 0, map_size.y));
+            if (result.map.tiles.get(tile_loc.x, tile_loc.y).kind == .floor) {
+                player.loc = .init(
+                    Map.tile_size * @as(f32, @floatFromInt(tile_loc.x)),
+                    Map.tile_size * @as(f32, @floatFromInt(tile_loc.y)),
+                );
+                break;
+            }
+        }
+
+        return result;
     }
 
     pub fn deinit(self: *Self) void {
@@ -77,7 +94,7 @@ pub const Level1 = struct {
         var iter = self.map.tiles.window(movement_area);
 
         while (iter.next()) |t| {
-            if (!t.t.is_wall) continue;
+            if (t.t.kind != .wall and t.t.kind != .corner) continue;
 
             const tile_loc = vector(
                 @as(f32, @floatFromInt(t.x)) * Map.tile_size,
@@ -123,7 +140,7 @@ pub const Level1 = struct {
                     .w = Map.tile_size,
                     .h = Map.tile_size,
                 };
-                Game.fillRect(rect, Color.blue.sdl());
+                Game.fillRect(rect, Color.blue);
             }
         };
 
@@ -136,11 +153,11 @@ pub const Level1 = struct {
         };
 
         if (self.raycast_start_loc) |start| {
-            Game.fillRect(.{ .x = start.x, .y = start.y, .w = 1, .h = 1 }, Color.green.sdl());
+            Game.fillRect(.{ .x = start.x, .y = start.y, .w = 1, .h = 1 }, Color.green);
         }
 
         if (self.raycast_end_loc) |end| {
-            Game.fillRect(.{ .x = end.x, .y = end.y, .w = 1, .h = 1 }, Color.red.sdl());
+            Game.fillRect(.{ .x = end.x, .y = end.y, .w = 1, .h = 1 }, Color.red);
         }
 
         self.player.render();

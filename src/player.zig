@@ -120,54 +120,19 @@ pub const Player = struct {
             self.loc.x - self.image_size.x * 0.5 * self.scale.x + self.sprite_offset.x * self.scale.x,
             self.loc.y - self.image_size.y * 0.5 * self.scale.y + self.sprite_offset.y * self.scale.y,
         );
-        var bottom_left: Vector = .init(top_left.x, top_left.y + self.image_size.y * self.scale.y);
+        const bottom_left: Vector = .init(top_left.x, top_left.y + self.image_size.y * self.scale.y);
         top_left = top_left.rotateAround(self.sprite_skew * std.math.pi * 0.5, bottom_left);
-        var top_right: Vector = .init(top_left.x + self.image_size.x * self.scale.x, top_left.y);
-        var bottom_right: Vector = .init(top_right.x, top_right.y + self.image_size.y * self.scale.y);
+        const top_right: Vector = .init(top_left.x + self.image_size.x * self.scale.x, top_left.y);
+        const bottom_right: Vector = .init(top_right.x, top_right.y + self.image_size.y * self.scale.y);
 
-        if (self.sprite_flip.horizontal) {
-            var tmp = top_right;
-            top_right = top_left;
-            top_left = tmp;
-
-            tmp = bottom_right;
-            bottom_right = bottom_left;
-            bottom_left = tmp;
-        }
-
-        if (self.sprite_flip.vertical) {
-            var tmp = top_left;
-            top_left = bottom_left;
-            bottom_left = tmp;
-
-            tmp = top_right;
-            top_right = bottom_right;
-            bottom_right = tmp;
-        }
-
-        const verts: []const sdl.render.Vertex = &.{
-            .{
-                .position = @bitCast(top_left.subtract(Game.camera.viewportLoc())),
-                .color = .{ .r = 1.0, .b = 1.0, .g = 1.0, .a = 1.0 },
-                .tex_coord = .{ .x = 0, .y = 0.0 },
-            },
-            .{
-                .position = @bitCast(top_right.subtract(Game.camera.viewportLoc())),
-                .color = .{ .r = 1.0, .b = 1.0, .g = 1.0, .a = 1.0 },
-                .tex_coord = .{ .x = 1.0, .y = 0.0 },
-            },
-            .{
-                .position = @bitCast(bottom_right.subtract(Game.camera.viewportLoc())),
-                .color = .{ .r = 1.0, .b = 1.0, .g = 1.0, .a = 1.0 },
-                .tex_coord = .{ .x = 1.0, .y = 1.0 },
-            },
-            .{
-                .position = @bitCast(bottom_left.subtract(Game.camera.viewportLoc())),
-                .color = .{ .r = 1.0, .b = 1.0, .g = 1.0, .a = 1.0 },
-                .tex_coord = .{ .x = 0, .y = 1.0 },
-            },
-        };
-        // Game.renderGeom(null, verts);
-        Game.renderGeom(self.image, verts);
+        Game.renderTextureByCorners(
+            self.image,
+            top_left,
+            top_right,
+            bottom_left,
+            bottom_right,
+            self.sprite_flip.horizontal,
+            self.sprite_flip.vertical,
+        );
     }
 };

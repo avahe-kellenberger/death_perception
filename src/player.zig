@@ -135,6 +135,16 @@ pub const Player = struct {
             bottom_left = tmp;
         }
 
+        if (self.sprite_flip.vertical) {
+            var tmp = top_left;
+            top_left = bottom_left;
+            bottom_left = tmp;
+
+            tmp = top_right;
+            top_right = bottom_right;
+            bottom_right = tmp;
+        }
+
         const verts: []const sdl.render.Vertex = &.{
             .{
                 .position = @bitCast(top_left.subtract(Game.camera.viewportLoc())),

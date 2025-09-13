@@ -30,6 +30,10 @@ pub const Player = struct {
     sprite_offset: Vector = .zero,
     /// Range from -1 to 1; 0 means no skewing.
     sprite_skew: f32 = 0,
+    sprite_flip: struct {
+        horizontal: bool = false,
+        vertical: bool = false,
+    },
 
     pub fn init() *Player {
         const image = Game.loadTexture("./assets/images/player.png", .nearest);
@@ -40,6 +44,7 @@ pub const Player = struct {
             .image_size = .{ .x = Game.tile_size, .y = Game.tile_size },
             .sprite_offset = .init(0, -8),
             .anim_player = .init(Game.alloc),
+            .sprite_flip = .{},
         };
 
         // Create idle animation
@@ -82,8 +87,14 @@ pub const Player = struct {
 
     pub fn update(self: *Self, dt: f32) void {
         var vel: Vector = .init(0, 0);
-        if (Input.isKeyPressed(.left)) vel.x -= max_speed;
-        if (Input.isKeyPressed(.right)) vel.x += max_speed;
+        if (Input.isKeyPressed(.left)) {
+            vel.x -= max_speed;
+            self.sprite_flip.horizontal = true;
+        }
+        if (Input.isKeyPressed(.right)) {
+            vel.x += max_speed;
+            self.sprite_flip.horizontal = false;
+        }
 
         if (Input.isKeyPressed(.up)) vel.y -= max_speed;
         if (Input.isKeyPressed(.down)) vel.y += max_speed;
@@ -96,15 +107,57 @@ pub const Player = struct {
         self.anim_player.update(dt);
     }
 
+    fn toVertex(v: Vector) sdl.render.Vertex {
+        return .{
+            .position = @bitCast(v.subtract(Game.camera.viewportLoc())),
+            .color = .{ .r = 1.0, .b = 1.0, .g = 1.0, .a = 1.0 },
+            .tex_coord = .{ .x = 0, .y = 0.5 },
+        };
+    }
+
     pub fn render(self: *Self) void {
         var top_left: Vector = .init(
             self.loc.x - self.image_size.x * 0.5 * self.scale.x + self.sprite_offset.x * self.scale.x,
             self.loc.y - self.image_size.y * 0.5 * self.scale.y + self.sprite_offset.y * self.scale.y,
         );
-        const bottom_left: Vector = .init(top_left.x, top_left.y + self.image_size.y * self.scale.y);
+        var bottom_left: Vector = .init(top_left.x, top_left.y + self.image_size.y * self.scale.y);
         top_left = top_left.rotateAround(self.sprite_skew * std.math.pi * 0.5, bottom_left);
-        const top_right: Vector = .init(top_left.x + self.image_size.x * self.scale.x, top_left.y);
+        var top_right: Vector = .init(top_left.x + self.image_size.x * self.scale.x, top_left.y);
+        var bottom_right: Vector = .init(top_right.x, top_right.y + self.image_size.y * self.scale.y);
 
-        Game.renderTextureAffine(self.image, null, top_left, top_right, bottom_left);
+        if (self.sprite_flip.horizontal) {
+            var tmp = top_right;
+            top_right = top_left;
+            top_left = tmp;
+
+            tmp = bottom_right;
+            bottom_right = bottom_left;
+            bottom_left = tmp;
+        }
+
+        const verts: []const sdl.render.Vertex = &.{
+            .{
+                .position = @bitCast(top_left.subtract(Game.camera.viewportLoc())),
+                .color = .{ .r = 1.0, .b = 1.0, .g = 1.0, .a = 1.0 },
+                .tex_coord = .{ .x = 0, .y = 0.0 },
+            },
+            .{
+                .position = @bitCast(top_right.subtract(Game.camera.viewportLoc())),
+                .color = .{ .r = 1.0, .b = 1.0, .g = 1.0, .a = 1.0 },
+                .tex_coord = .{ .x = 1.0, .y = 0.0 },
+            },
+            .{
+                .position = @bitCast(bottom_right.subtract(Game.camera.viewportLoc())),
+                .color = .{ .r = 1.0, .b = 1.0, .g = 1.0, .a = 1.0 },
+                .tex_coord = .{ .x = 1.0, .y = 1.0 },
+            },
+            .{
+                .position = @bitCast(bottom_left.subtract(Game.camera.viewportLoc())),
+                .color = .{ .r = 1.0, .b = 1.0, .g = 1.0, .a = 1.0 },
+                .tex_coord = .{ .x = 0, .y = 1.0 },
+            },
+        };
+        // Game.renderGeom(null, verts);
+        Game.renderGeom(self.image, verts);
     }
 };

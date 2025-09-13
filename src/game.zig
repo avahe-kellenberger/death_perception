@@ -221,6 +221,37 @@ pub fn renderTextureAffine(
     }
 }
 
+pub fn renderGeom(t: ?Texture, vertices: []const sdl.render.Vertex) void {
+    var x: f32 = std.math.inf(f32);
+    var y: f32 = std.math.inf(f32);
+    var max_x: f32 = -x;
+    var max_y: f32 = -y;
+    for (vertices) |v| {
+        x = @min(x, v.position.x);
+        y = @min(y, v.position.y);
+        max_x = @max(max_x, v.position.x);
+        max_y = @max(max_y, v.position.y);
+    }
+
+    // TODO:
+    // const dest: FRect = .{
+    //     .x = x,
+    //     .y = y,
+    //     .w = max_x - x,
+    //     .h = max_y - y,
+    // };
+
+    // if (camera.intersects(dest)) {
+    if (true) {
+        renderer.renderGeometry(t, vertices, &.{ 3, 1, 0, 2, 1, 3 }) catch {
+            if (sdl.errors.get()) |msg| {
+                std.log.err("{s}", .{msg});
+            }
+            unreachable;
+        };
+    }
+}
+
 pub fn fillRect(dest: FRect, color: Color) void {
     if (camera.intersects(dest)) if (camera.getScale()) |_| {
         var r = dest;

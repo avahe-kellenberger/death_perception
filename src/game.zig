@@ -14,6 +14,8 @@ const ui = @import("./ui/lib/component.zig");
 const TestUI = @import("./ui/test.zig");
 const MainMenu = @import("./ui/main_menu.zig");
 
+const Vector = @import("math/vector.zig").Vector(f32);
+
 const Level1 = @import("./levels/level1.zig").Level1;
 
 pub const GameState = enum {
@@ -153,9 +155,9 @@ pub fn loadTexture(path: [:0]const u8, mode: sdl.surface.ScaleMode) Texture {
     return tex;
 }
 
-pub fn renderTexture(t: Texture, src: ?FRect, dst: FRect) void {
-    if (camera.intersects(dst)) {
-        var r = dst;
+pub fn renderTexture(t: Texture, src: ?FRect, dest: FRect) void {
+    if (camera.intersects(dest)) {
+        var r = dest;
         r.x -= camera.viewport.x;
         r.y -= camera.viewport.y;
 
@@ -163,9 +165,36 @@ pub fn renderTexture(t: Texture, src: ?FRect, dst: FRect) void {
     }
 }
 
-pub fn fillRect(dst: FRect, color: sdl.pixels.Color) void {
-    if (camera.intersects(dst)) if (camera.getScale()) |_| {
-        var r = dst;
+pub fn renderTextureAffine(
+    t: Texture,
+    src: ?FRect,
+    top_left: Vector,
+    top_right: Vector,
+    bottom_left: Vector,
+) void {
+    const x = @min(top_left.x, bottom_left.x);
+    const y = @min(top_left.y, top_right.y);
+    const dest: FRect = .{
+        .x = x,
+        .y = y,
+        .w = top_right.x - x,
+        .h = bottom_left.y - y,
+    };
+    if (camera.intersects(dest)) {
+        const viewportLoc = camera.viewportLoc();
+        renderer.renderTextureAffine(
+            t,
+            src,
+            @bitCast(top_left.subtract(viewportLoc)),
+            @bitCast(top_right.subtract(viewportLoc)),
+            @bitCast(bottom_left.subtract(viewportLoc)),
+        ) catch unreachable;
+    }
+}
+
+pub fn fillRect(dest: FRect, color: sdl.pixels.Color) void {
+    if (camera.intersects(dest)) if (camera.getScale()) |_| {
+        var r = dest;
         r.x -= camera.viewport.x;
         r.y -= camera.viewport.y;
 

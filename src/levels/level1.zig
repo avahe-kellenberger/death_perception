@@ -28,7 +28,7 @@ pub const Level1 = struct {
     var floor_tiles_image: Texture = undefined;
     var wall_tiles_image: Texture = undefined;
 
-    player: Player,
+    player: *Player,
     map: Map,
 
     // NOTE: Testing code below, can remove later
@@ -60,6 +60,7 @@ pub const Level1 = struct {
         self.map.deinit();
         floor_tiles_image.deinit();
         wall_tiles_image.deinit();
+        Game.alloc.destroy(self.player);
     }
 
     pub fn update(self: *Self, dt: f32) void {
@@ -101,7 +102,7 @@ pub const Level1 = struct {
             }
         }
 
-        Game.camera.centerOnPoint(self.player.loc);
+        Game.camera.centerOnPoint(self.player.loc.add(self.player.sprite_offset));
 
         if (Input.getButtonState(.left) == .just_pressed) {
             self.raycast_start_loc = Game.camera.screenToWorld(Input.mouse.loc).round();

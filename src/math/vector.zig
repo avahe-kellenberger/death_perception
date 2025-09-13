@@ -5,7 +5,7 @@ const expectEqual = std.testing.expectEqual;
 const expectApproxEqAbs = std.testing.expectApproxEqAbs;
 
 pub fn Vector(T: type) type {
-    return struct {
+    return packed struct {
         pub const Self = @This();
         pub const zero = switch (@typeInfo(T)) {
             .float => vector(0, 0),
@@ -98,6 +98,38 @@ pub fn Vector(T: type) type {
 
         pub fn round(self: Self) Self {
             return .init(@round(self.x), @round(self.y));
+        }
+
+        /// Gets a copy of this vector rotated around its origin by the given amount.
+        /// @param theta the number of radians to rotate the vector.
+        pub fn rotate(self: Self, theta: f32) Self {
+            const x = self.x * @cos(theta) - self.y * @sin(theta);
+            const y = self.x * @sin(theta) + self.y * @cos(theta);
+            switch (@typeInfo(T)) {
+                .float => return .{ .x = x, .y = y },
+                .int => return .{
+                    .x = @as(T, @intFromFloat(@round(x))),
+                    .y = @as(T, @intFromFloat(@round(y))),
+                },
+                else => unreachable,
+            }
+        }
+
+        /// Rotates counter-clockwise around the given anchor point.
+        /// @param theta The radians to rotate.
+        /// @param anchorPoint The anchor point to rotate around.
+        /// @return A rotated point around the anchor point.
+        pub fn rotateAround(self: Self, theta: f32, anchor: Self) Self {
+            const x = anchor.x + (@cos(theta) * (self.x - anchor.x) - @sin(theta) * (self.y - anchor.y));
+            const y = anchor.y + (@sin(theta) * (self.x - anchor.x) + @cos(theta) * (self.y - anchor.y));
+            switch (@typeInfo(T)) {
+                .float => return .{ .x = x, .y = y },
+                .int => return .{
+                    .x = @as(T, @intFromFloat(@round(x))),
+                    .y = @as(T, @intFromFloat(@round(y))),
+                },
+                else => unreachable,
+            }
         }
     };
 }

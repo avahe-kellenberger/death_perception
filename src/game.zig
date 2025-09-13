@@ -233,16 +233,14 @@ pub fn renderGeom(t: ?Texture, vertices: []const sdl.render.Vertex) void {
         max_y = @max(max_y, v.position.y);
     }
 
-    // TODO:
-    // const dest: FRect = .{
-    //     .x = x,
-    //     .y = y,
-    //     .w = max_x - x,
-    //     .h = max_y - y,
-    // };
+    const dest: FRect = .{
+        .x = x + camera.viewport.x,
+        .y = y + camera.viewport.y,
+        .w = max_x - x,
+        .h = max_y - y,
+    };
 
-    // if (camera.intersects(dest)) {
-    if (true) {
+    if (camera.intersects(dest)) {
         renderer.renderGeometry(t, vertices, &.{ 3, 1, 0, 2, 1, 3 }) catch {
             if (sdl.errors.get()) |msg| {
                 std.log.err("{s}", .{msg});

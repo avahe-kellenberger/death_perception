@@ -58,7 +58,7 @@ pub const Level1 = struct {
 
         // Make sure the players spawns on the ground.
         while (true) {
-            const tile_loc: UVector = .init(rand(usize, 0, map_size.x), rand(usize, 0, map_size.y));
+            const tile_loc: UVector = .init(rand(usize, 0, map_size.x - 1), rand(usize, 0, map_size.y - 1));
             if (result.map.tiles.get(tile_loc.x, tile_loc.y).kind == .floor) {
                 player.loc = .init(
                     Map.tile_size * @as(f32, @floatFromInt(tile_loc.x)),

@@ -56,7 +56,7 @@ pub fn init() void {
     title.setHeight(100);
     title.content = .{
         .text = .{
-            .content = .borrow("Death Perception"),
+            .string = .borrow("Death Perception"),
             .align_h = .center,
             .align_v = .center,
             .font = .{
@@ -181,7 +181,7 @@ fn createMenuButton(comptime text: []const u8) UIComponent {
     button.background_color = button_color;
     button.content = .{
         .text = .{
-            .content = .borrow(text),
+            .string = .borrow(text),
             .align_h = .center,
             .align_v = .center,
             .color = .white,

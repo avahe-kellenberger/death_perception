@@ -6,14 +6,16 @@ const Allocator = std.mem.Allocator;
 
 const sdl = @import("sdl3");
 
+const Game = @import("../game.zig");
+
 const ui = @import("./lib/component.zig");
 const UIComponent = ui.Component;
 
 const Color = @import("../color.zig").Color;
 const Input = @import("../input.zig");
+const Server = @import("../net/server.zig");
 const t = @import("./lib/content/sprite.zig").SpriteCoord.xy;
 const Spritesheet = @import("../spritesheet.zig").Spritesheet;
-const Game = @import("../game.zig");
 
 var root: ?UIComponent = null;
 
@@ -57,7 +59,7 @@ pub fn init() void {
     title.setHeight(100);
     title.content = .{
         .text = .{
-            .content = .borrow("Death Perception"),
+            .string = .borrow("Death Perception"),
             .align_h = .center,
             .align_v = .center,
             .font = .{
@@ -78,7 +80,7 @@ pub fn init() void {
     sub_title.setHeight(100);
     sub_title.content = .{
         .text = .{
-            .content = .borrow("Lobby"),
+            .string = .borrow("Lobby"),
             .align_h = .center,
             .align_v = .start,
             .font = .{
@@ -97,16 +99,36 @@ pub fn init() void {
 
     var lobby = UIComponent.init();
     lobby.setStackDirection(.vertical);
-    lobby.setMargin(100); // margin must be set for the bug to happen
-    lobby.setWidth(250);
     lobby.background_color = .blue;
 
-    // TODO there is a bug here with the height of the lobby
-    // the lobby height should be zero, so it should fill available space
-    // and the start button should be at the bottom of the foreground container
-    // this is actually a bug in the layout mode of the foreground container
-
     foreground.add(lobby);
+
+    var buttons = UIComponent.init();
+    buttons.setStackDirection(.horizontal);
+    buttons.setMarginInsets(.{ .top = 50 });
+    buttons.setHeight(60);
+
+    var multiplayer_button = createButton("Start Multiplayer");
+    multiplayer_button.setWidth(350);
+    multiplayer_button.on_mouse_button = .{
+        .context = undefined,
+        .handler = struct {
+            fn handler(comp: *UIComponent, event: sdl.events.MouseButton, _: *anyopaque) void {
+                if (event.button == .left and event.down) {
+                    if (Server.isListening()) {
+                        Server.stop();
+                        comp.content.text.setStr("Start Multiplayer");
+                    } else {
+                        Server.start();
+                        comp.content.text.setStr("Stop Multiplayer");
+                    }
+                }
+            }
+        }.handler,
+    };
+    buttons.add(multiplayer_button);
+
+    buttons.add(UIComponent.init());
 
     var start_button = createButton("Start!");
     start_button.setWidth(250);
@@ -120,8 +142,9 @@ pub fn init() void {
             }
         }.handler,
     };
+    buttons.add(start_button);
 
-    foreground.add(start_button);
+    foreground.add(buttons);
 
     var r = UIComponent.init();
     r.setStackDirection(.overlap);
@@ -162,11 +185,10 @@ pub fn render(width: f32, height: f32) void {
 fn createButton(comptime text: []const u8) UIComponent {
     const button_color: Color = .{ .r = 11, .g = 50, .b = 69 };
     var button = UIComponent.init();
-    button.setHeight(60);
     button.background_color = button_color;
     button.content = .{
         .text = .{
-            .content = .borrow(text),
+            .string = .borrow(text),
             .align_h = .center,
             .align_v = .center,
             .color = .white,

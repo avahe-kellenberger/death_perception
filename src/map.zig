@@ -18,6 +18,9 @@ const vector = vector_mod.vector;
 
 const CollisionShape = @import("math/collisionshape.zig").CollisionShape;
 
+const sat = @import("math/sat.zig");
+const CollisionResult = sat.CollisionResult;
+
 const Color = @import("color.zig").Color;
 
 pub const TileKind = enum { floor, wall, corner, inner };
@@ -35,6 +38,14 @@ pub const TileData = struct {
     tile_y: usize,
     x: f32,
     y: f32,
+};
+
+pub const Body = struct {
+    pub const Self = @This();
+    loc: Vector,
+    velocity: Vector,
+    shape: CollisionShape,
+    pub fn update(_: *Self, _: f32) void {}
 };
 
 pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type {
@@ -376,9 +387,14 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             }
         }
 
-        pub fn getPotentialArea(shape: *const CollisionShape, start_loc: Vector, movement: Vector) ArrayWindow {
+        pub fn getPotentialArea(
+            shape: *const CollisionShape,
+            start_loc: Vector,
+            movement: Vector,
+        ) ArrayWindow {
             switch (shape.*) {
                 .aabb => |aabb| {
+                    // TODO: This is size.x negative?? Corrupt data?
                     // Middle of the aabb is its location, need half size from its center.
                     const size = aabb.bottom_right.subtract(aabb.top_left).scale(0.5);
                     const min_x = aabb.top_left.x + @min(start_loc.x, start_loc.x + movement.x) - size.x;
@@ -522,5 +538,61 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 return return_tile;
             }
         };
+
+        pub fn CollisionIterator(T: type) type {
+            return struct {
+                pub const CollisionIter = @This();
+                map: *Self,
+                body: *T,
+                shape: CollisionShape,
+                dt: f32,
+                is_fast_object: bool,
+
+                pub fn init(map: *Self, body: *T, shape: CollisionShape, dt: f32) CollisionIter {
+                    return .{
+                        .map = map,
+                        .body = body,
+                        .shape = shape,
+                        .dt = dt,
+                        // .is_fast_object = body.velocity.getMagnitude() * dt >= tile_size,
+                        .is_fast_object = false,
+                    };
+                }
+
+                pub fn next(iter: *CollisionIter) ?CollisionResult {
+                    const start_loc = iter.body.loc;
+                    iter.body.update(iter.dt);
+
+                    const tile_shape: CollisionShape = iter.map.collision_shape;
+
+                    // TODO: Get different tiles if iter.body.is_fast_object
+                    const movement_area = Self.getPotentialArea(
+                        &iter.shape,
+                        iter.body.loc,
+                        iter.body.loc.subtract(start_loc),
+                    );
+
+                    var tile_iter = iter.map.tiles.window(movement_area);
+                    while (tile_iter.next()) |t| {
+                        if (t.t.kind != .wall and t.t.kind != .corner) continue;
+
+                        const tile_loc = vector(
+                            @as(f32, @floatFromInt(t.x)) * Self.tile_size,
+                            @as(f32, @floatFromInt(t.y)) * Self.tile_size,
+                        );
+                        return sat.collides(
+                            Game.alloc,
+                            iter.body.loc,
+                            iter.shape,
+                            iter.body.loc.subtract(start_loc),
+                            tile_loc,
+                            tile_shape,
+                            Vector.zero,
+                        );
+                    }
+                    return null;
+                }
+            };
+        }
     };
 }

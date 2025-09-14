@@ -23,6 +23,7 @@ pub const Player = struct {
     pub const collision_shape: CollisionShape = .{ .circle = .init(.init(0, -7), 7.0) };
 
     loc: Vector = .zero,
+    velocity: Vector = .zero,
     scale: Vector = .init(1, 1),
     image: Texture,
     image_size: Vector,
@@ -86,33 +87,25 @@ pub const Player = struct {
     }
 
     pub fn update(self: *Self, dt: f32) void {
-        var vel: Vector = .init(0, 0);
+        self.velocity = Vector.zero;
         if (Input.isKeyPressed(.left)) {
-            vel.x -= max_speed;
+            self.velocity.x -= max_speed;
             self.sprite_flip.horizontal = true;
         }
         if (Input.isKeyPressed(.right)) {
-            vel.x += max_speed;
+            self.velocity.x += max_speed;
             self.sprite_flip.horizontal = false;
         }
 
-        if (Input.isKeyPressed(.up)) vel.y -= max_speed;
-        if (Input.isKeyPressed(.down)) vel.y += max_speed;
+        if (Input.isKeyPressed(.up)) self.velocity.y -= max_speed;
+        if (Input.isKeyPressed(.down)) self.velocity.y += max_speed;
 
-        vel = vel.maxMagnitude(max_speed);
+        self.velocity = self.velocity.maxMagnitude(max_speed);
 
-        self.loc.x += vel.x * dt;
-        self.loc.y += vel.y * dt;
+        self.loc.x += self.velocity.x * dt;
+        self.loc.y += self.velocity.y * dt;
 
         self.anim_player.update(dt);
-    }
-
-    fn toVertex(v: Vector) sdl.render.Vertex {
-        return .{
-            .position = @bitCast(v.subtract(Game.camera.viewportLoc())),
-            .color = .{ .r = 1.0, .b = 1.0, .g = 1.0, .a = 1.0 },
-            .tex_coord = .{ .x = 0, .y = 0.5 },
-        };
     }
 
     pub fn render(self: *Self) void {

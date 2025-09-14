@@ -131,6 +131,17 @@ pub fn Vector(T: type) type {
                 else => unreachable,
             }
         }
+
+        /// Gets the angle of this vector, in radians.
+        /// (from -pi to pi)
+        pub fn getAngleRadians(self: Self) f32 {
+            // std.math.degreesToRadians(degrees)
+            return std.math.atan2(self.y, self.x);
+        }
+
+        pub fn getAngleDegrees(self: Self) f32 {
+            return std.math.radiansToDegrees(self.getAngleRadians());
+        }
     };
 }
 

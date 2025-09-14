@@ -174,8 +174,23 @@ pub fn renderTexture(t: Texture, src: ?FRect, dest: FRect) void {
         var r = dest;
         r.x -= camera.viewport.x;
         r.y -= camera.viewport.y;
-
         renderer.renderTexture(t, src, r) catch unreachable;
+    }
+}
+
+pub fn renderTextureRotated(
+    t: Texture,
+    src: ?FRect,
+    dest: FRect,
+    angle: f32,
+    center: Vector,
+    flip: sdl.surface.FlipMode,
+) void {
+    if (camera.intersects(dest)) {
+        var r = dest;
+        r.x -= camera.viewport.x;
+        r.y -= camera.viewport.y;
+        renderer.renderTextureRotated(t, src, r, angle, @bitCast(center), flip) catch unreachable;
     }
 }
 
@@ -204,6 +219,78 @@ pub fn renderTextureAffine(
             @bitCast(bottom_left.subtract(viewportLoc)),
         ) catch unreachable;
     }
+}
+
+pub fn renderTextureByCorners(
+    t: Texture,
+    top_left: Vector,
+    top_right: Vector,
+    bottom_left: Vector,
+    bottom_right: Vector,
+    flip_horizontal: bool,
+    flip_vertical: bool,
+) void {
+    const x: f32 = @min(top_left.x, top_right.x, bottom_left.x, bottom_right.x);
+    const y: f32 = @min(top_left.y, top_right.y, bottom_left.y, bottom_right.y);
+    const max_x: f32 = @max(top_left.x, top_right.x, bottom_left.x, bottom_right.x);
+    const max_y: f32 = @max(top_left.y, top_right.y, bottom_left.y, bottom_right.y);
+    const dest: FRect = .{
+        .x = x,
+        .y = y,
+        .w = max_x - x,
+        .h = max_y - y,
+    };
+    if (!camera.intersects(dest)) return;
+
+    var tl = top_left;
+    var tr = top_right;
+    var bl = bottom_left;
+    var br = bottom_right;
+
+    if (flip_horizontal) {
+        var tmp = tr;
+        tr = tl;
+        tl = tmp;
+
+        tmp = br;
+        br = bl;
+        bl = tmp;
+    }
+
+    if (flip_vertical) {
+        var tmp = tl;
+        tl = bl;
+        bl = tmp;
+
+        tmp = tr;
+        tr = br;
+        br = tmp;
+    }
+
+    const verts: []const sdl.render.Vertex = &.{
+        .{
+            .position = @bitCast(tl.subtract(camera.viewportLoc())),
+            .color = .{ .r = 1.0, .b = 1.0, .g = 1.0, .a = 1.0 },
+            .tex_coord = .{ .x = 0, .y = 0.0 },
+        },
+        .{
+            .position = @bitCast(tr.subtract(camera.viewportLoc())),
+            .color = .{ .r = 1.0, .b = 1.0, .g = 1.0, .a = 1.0 },
+            .tex_coord = .{ .x = 1.0, .y = 0.0 },
+        },
+        .{
+            .position = @bitCast(br.subtract(camera.viewportLoc())),
+            .color = .{ .r = 1.0, .b = 1.0, .g = 1.0, .a = 1.0 },
+            .tex_coord = .{ .x = 1.0, .y = 1.0 },
+        },
+        .{
+            .position = @bitCast(bl.subtract(camera.viewportLoc())),
+            .color = .{ .r = 1.0, .b = 1.0, .g = 1.0, .a = 1.0 },
+            .tex_coord = .{ .x = 0, .y = 1.0 },
+        },
+    };
+
+    renderer.renderGeometry(t, verts, &.{ 3, 1, 0, 2, 1, 3 }) catch unreachable;
 }
 
 pub fn fillRect(dest: FRect, color: Color) void {

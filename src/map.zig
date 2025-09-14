@@ -18,6 +18,9 @@ const vector = vector_mod.vector;
 
 const CollisionShape = @import("math/collisionshape.zig").CollisionShape;
 
+const sat = @import("math/sat.zig");
+const CollisionResult = sat.CollisionResult;
+
 const Color = @import("color.zig").Color;
 
 pub const TileKind = enum { floor, wall, corner, inner };
@@ -31,14 +34,25 @@ pub const Tile = struct {
 
 pub const TileData = struct {
     tile: *Tile,
-    x: usize,
-    y: usize,
+    tile_x: usize,
+    tile_y: usize,
+    x: f32,
+    y: f32,
+};
+
+pub const Body = struct {
+    pub const Self = @This();
+    loc: Vector,
+    velocity: Vector,
+    shape: CollisionShape,
+    pub fn update(_: *Self, _: f32) void {}
 };
 
 pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type {
     return struct {
         pub const Self = @This();
         pub const tile_size: f32 = _tile_size;
+        pub const tile_diagonal_len: f32 = _tile_size * std.math.sqrt(2.0);
 
         floor_tiles_sheet: Spritesheet,
         wall_tiles_sheet: Spritesheet,
@@ -373,9 +387,14 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             }
         }
 
-        pub fn getPotentialArea(shape: *const CollisionShape, start_loc: Vector, movement: Vector) ArrayWindow {
+        pub fn getPotentialArea(
+            shape: *const CollisionShape,
+            start_loc: Vector,
+            movement: Vector,
+        ) ArrayWindow {
             switch (shape.*) {
                 .aabb => |aabb| {
+                    // TODO: This is size.x negative?? Corrupt data?
                     // Middle of the aabb is its location, need half size from its center.
                     const size = aabb.bottom_right.subtract(aabb.top_left).scale(0.5);
                     const min_x = aabb.top_left.x + @min(start_loc.x, start_loc.x + movement.x) - size.x;
@@ -443,8 +462,14 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 };
             }
 
-            fn getTileData(iter: *RaycastIterator, x: usize, y: usize) TileData {
-                return .{ .x = x, .y = y, .tile = iter.map.tiles.get(x, y) };
+            fn getTileData(iter: *RaycastIterator, tile_x: usize, tile_y: usize) TileData {
+                return .{
+                    .x = iter.current_loc.x,
+                    .y = iter.current_loc.y,
+                    .tile_x = tile_x,
+                    .tile_y = tile_y,
+                    .tile = iter.map.tiles.get(tile_x, tile_y),
+                };
             }
 
             fn dispToTile(tile_coord: usize, loc: f32, sign: isize) f32 {
@@ -455,39 +480,45 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             fn determineTile(map: *Self, current_loc: Vector) TileData {
                 const tile_x = @as(usize, @intFromFloat(@floor(current_loc.x / tile_size)));
                 const tile_y = @as(usize, @intFromFloat(@floor(current_loc.y / tile_size)));
-                return .{ .x = tile_x, .y = tile_y, .tile = map.tiles.get(tile_x, tile_y) };
+                return .{
+                    .x = current_loc.x,
+                    .y = current_loc.y,
+                    .tile_x = tile_x,
+                    .tile_y = tile_y,
+                    .tile = map.tiles.get(tile_x, tile_y),
+                };
             }
 
             pub fn next(iter: *RaycastIterator) ?TileData {
                 const return_tile = iter.next_tile;
                 if (return_tile) |rt| {
-                    const disp_x = dispToTile(rt.x, iter.current_loc.x, iter.sign_x);
-                    const disp_y = dispToTile(rt.y, iter.current_loc.y, iter.sign_y);
+                    const disp_x = dispToTile(rt.tile_x, iter.current_loc.x, iter.sign_x);
+                    const disp_y = dispToTile(rt.tile_y, iter.current_loc.y, iter.sign_y);
                     const slope_diff = @abs(disp_y) - @abs(disp_x * iter.slope);
                     if (slope_diff > 0) {
                         iter.current_loc.x += disp_x;
                         iter.current_loc.y += disp_x * iter.slope;
-                        const new_x = @as(isize, @intCast(rt.x)) + iter.sign_x;
+                        const new_x = @as(isize, @intCast(rt.tile_x)) + iter.sign_x;
                         if (new_x < 0 or new_x >= width) {
                             iter.next_tile = null;
                         } else {
-                            iter.next_tile = iter.getTileData(@as(usize, @intCast(new_x)), rt.y);
+                            iter.next_tile = iter.getTileData(@as(usize, @intCast(new_x)), rt.tile_y);
                         }
                     } else if (slope_diff < 0) {
                         iter.current_loc.x += disp_y / iter.slope;
                         iter.current_loc.y += disp_y;
-                        const new_y = @as(isize, @intCast(rt.y)) + iter.sign_y;
+                        const new_y = @as(isize, @intCast(rt.tile_y)) + iter.sign_y;
                         if (new_y < 0 or new_y >= height) {
                             iter.next_tile = null;
                         } else {
-                            iter.next_tile = iter.getTileData(rt.x, @as(usize, @intCast(new_y)));
+                            iter.next_tile = iter.getTileData(rt.tile_x, @as(usize, @intCast(new_y)));
                         }
                     } else {
                         // Going through intersection x and y at the same time
                         iter.current_loc.x += disp_x;
                         iter.current_loc.y += disp_y;
-                        const new_x = @as(isize, @intCast(rt.x)) + iter.sign_x;
-                        const new_y = @as(isize, @intCast(rt.y)) + iter.sign_y;
+                        const new_x = @as(isize, @intCast(rt.tile_x)) + iter.sign_x;
+                        const new_y = @as(isize, @intCast(rt.tile_y)) + iter.sign_y;
                         if (new_x < 0 or new_x >= width or new_y < 0 or new_y >= height) {
                             iter.next_tile = null;
                         } else {
@@ -507,5 +538,61 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 return return_tile;
             }
         };
+
+        pub fn CollisionIterator(T: type) type {
+            return struct {
+                pub const CollisionIter = @This();
+                map: *Self,
+                body: *T,
+                shape: CollisionShape,
+                dt: f32,
+                is_fast_object: bool,
+
+                pub fn init(map: *Self, body: *T, shape: CollisionShape, dt: f32) CollisionIter {
+                    return .{
+                        .map = map,
+                        .body = body,
+                        .shape = shape,
+                        .dt = dt,
+                        // .is_fast_object = body.velocity.getMagnitude() * dt >= tile_size,
+                        .is_fast_object = false,
+                    };
+                }
+
+                pub fn next(iter: *CollisionIter) ?CollisionResult {
+                    const start_loc = iter.body.loc;
+                    iter.body.update(iter.dt);
+
+                    const tile_shape: CollisionShape = iter.map.collision_shape;
+
+                    // TODO: Get different tiles if iter.body.is_fast_object
+                    const movement_area = Self.getPotentialArea(
+                        &iter.shape,
+                        iter.body.loc,
+                        iter.body.loc.subtract(start_loc),
+                    );
+
+                    var tile_iter = iter.map.tiles.window(movement_area);
+                    while (tile_iter.next()) |t| {
+                        if (t.t.kind != .wall and t.t.kind != .corner) continue;
+
+                        const tile_loc = vector(
+                            @as(f32, @floatFromInt(t.x)) * Self.tile_size,
+                            @as(f32, @floatFromInt(t.y)) * Self.tile_size,
+                        );
+                        return sat.collides(
+                            Game.alloc,
+                            iter.body.loc,
+                            iter.shape,
+                            iter.body.loc.subtract(start_loc),
+                            tile_loc,
+                            tile_shape,
+                            Vector.zero,
+                        );
+                    }
+                    return null;
+                }
+            };
+        }
     };
 }

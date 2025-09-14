@@ -100,15 +100,16 @@ pub const ServerConnection = struct {
     state: ClientState = .init,
 
     /// Connect to a remote game server.
-    pub fn connect(socket: sdl.net.StreamSocket) Self {
-        // TODO
+    pub fn connect(address: sdl.net.Address, port: u16) !Self {
+        errdefer address.deinit();
+        const socket = try sdl.net.StreamSocket.initClient(address, port);
+        // TODO block wait for socket to connect?
         return .{ .socket = socket };
     }
 
     /// Close and deinit the connection memory.
     pub fn deinit(self: *Self) void {
-        // TODO
-        _ = self;
+        self.socket.deinit();
     }
 
     /// Read update data from the server.

@@ -17,7 +17,6 @@ const t = @import("./lib/content/sprite.zig").SpriteCoord.xy;
 const Spritesheet = @import("../spritesheet.zig").Spritesheet;
 
 const Server = @import("../net/server.zig");
-const NetworkSession = @import("../net/session.zig");
 
 var root: ?UIComponent = null;
 

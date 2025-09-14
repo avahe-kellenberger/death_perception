@@ -6,7 +6,7 @@ const sdl = @import("sdl3");
 const Game = @import("../game.zig");
 const ClientConnection = @import("./client.zig").ClientConnection;
 
-const PORT: u16 = 33284; // DEATH
+pub const PORT: u16 = 33284; // DEATH
 
 var running: std.atomic.Value(bool) = .init(false);
 var thread: ?std.Thread = null;

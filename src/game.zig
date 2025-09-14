@@ -16,6 +16,7 @@ const ui = @import("./ui/lib/component.zig");
 const TestUI = @import("./ui/test.zig");
 const MainMenu = @import("./ui/main_menu.zig");
 const Lobby = @import("./ui/lobby.zig");
+const JoinGame = @import("./ui/join_game.zig");
 
 const Level1 = @import("./levels/level1.zig").Level1;
 
@@ -52,6 +53,7 @@ pub fn init(_alloc: Allocator, _renderer: Renderer, _camera: Camera) void {
 
     MainMenu.init();
     Lobby.init();
+    JoinGame.init();
 
     level = Level1.init();
     // TODO
@@ -67,6 +69,7 @@ pub fn input(event: sdl.events.Event) void {
         .test_ui => TestUI.input(event),
         .main_menu => MainMenu.input(event),
         .lobby => Lobby.input(event),
+        .join_game => JoinGame.input(event),
         else => {
             // Others
         },
@@ -88,7 +91,7 @@ pub fn update(frame_delay: f32) void {
             // TODO
         },
         .join_game => {
-            // TODO
+            JoinGame.update(frame_delay);
         },
         .settings => {
             // TODO
@@ -131,7 +134,7 @@ pub fn render() void {
             // TODO
         },
         .join_game => {
-            // TODO
+            JoinGame.render(camera.size.x, camera.size.y);
         },
         .settings => {
             // TODO

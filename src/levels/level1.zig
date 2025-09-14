@@ -15,6 +15,7 @@ const collides = @import("../math/sat.zig").collides;
 
 const Game = @import("../game.zig");
 const Input = @import("../input.zig");
+const Entity = @import("../entity.zig").Entity;
 const Player = @import("../player.zig").Player;
 const Spritesheet = @import("../spritesheet.zig").Spritesheet;
 const CollisionShape = @import("../math/collisionshape.zig").CollisionShape;
@@ -24,7 +25,7 @@ const Bullet = @import("../projectiles/bullet.zig").Bullet;
 
 const TileData = @import("../map.zig").TileData;
 
-const map_size: UVector = .init(144, 144);
+const map_size: UVector = .init(120, 77);
 
 const Map = @import("../map.zig").Map(map_size.x, map_size.y, Game.tile_size);
 
@@ -34,13 +35,12 @@ pub const Level1 = struct {
     var floor_tiles_image: Texture = undefined;
     var wall_tiles_image: Texture = undefined;
 
-    player: *Player,
     map: Map,
+    player: *Player,
+    bullets: std.ArrayList(*Bullet) = .empty,
 
     // NOTE: Testing code below, can remove later
     raycast_hit_data: ?TileData = null,
-    // TODO: Object pool?
-    bullets: std.ArrayList(*Bullet) = .empty,
 
     pub fn init() Level1 {
         // Map floor color so we can ignore drawing "empty" tiles
@@ -57,7 +57,7 @@ pub const Level1 = struct {
 
         const result: Level1 = .{
             .player = player,
-            .map = .init(floor_sheet, wall_sheet, 47.0, 10),
+            .map = .init(floor_sheet, wall_sheet, 47.0, 2),
         };
 
         // Make sure the players spawns on the ground.
@@ -119,7 +119,7 @@ pub const Level1 = struct {
             // Shoot a bullet
             const bullet = Bullet.init(
                 player_center,
-                clicked_loc.subtract(player_center).normalize().scale(100.0),
+                clicked_loc.subtract(player_center).normalize().scale(300.0),
             );
             self.bullets.append(Game.alloc, bullet) catch unreachable;
         }

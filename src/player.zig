@@ -114,7 +114,11 @@ pub const Player = struct {
             self.loc.y - self.image_size.y * 0.5 * self.scale.y + self.sprite_offset.y * self.scale.y,
         );
         const bottom_left: Vector = .init(top_left.x, top_left.y + self.image_size.y * self.scale.y);
-        top_left = top_left.rotateAround(self.sprite_skew * std.math.pi * 0.5, bottom_left);
+        if (self.sprite_flip.horizontal) {
+            top_left = top_left.rotateAround(-self.sprite_skew * std.math.pi * 0.5, bottom_left);
+        } else {
+            top_left = top_left.rotateAround(self.sprite_skew * std.math.pi * 0.5, bottom_left);
+        }
         const top_right: Vector = .init(top_left.x + self.image_size.x * self.scale.x, top_left.y);
         const bottom_right: Vector = .init(top_right.x, top_right.y + self.image_size.y * self.scale.y);
 

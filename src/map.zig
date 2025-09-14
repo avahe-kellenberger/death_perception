@@ -80,10 +80,10 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             while (iter.next()) |e| {
                 // Initialize all tiles
                 e.t.* = .{};
-                if (e.x < border_thickness or
-                    e.x >= (width - border_thickness) or
-                    e.y < border_thickness or
-                    e.y >= (height - border_thickness) or
+                if (e.x < border_thickness + 1 or
+                    e.x >= (width - border_thickness - 1) or
+                    e.y < border_thickness + 1 or
+                    e.y >= (height - border_thickness - 1) or
                     (density > 0 and density >= rand(f32, 0, 100)))
                 {
                     e.t.kind = .wall;
@@ -354,6 +354,15 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 }
             }
 
+            Game.fillRect(Game.camera.viewport, Color.red);
+            Game.renderer.setDrawBlendMode(.none) catch unreachable;
+            Game.fillRect(.{
+                .x = Game.camera.viewport.x + 50.0,
+                .y = Game.camera.viewport.y + 50.0,
+                .w = 100.0,
+                .h = Game.camera.viewport.x,
+            }, Color.transparent);
+
             // Render wall tiles
             {
                 var iter = self.tiles.window(window);
@@ -554,8 +563,7 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                         .body = body,
                         .shape = shape,
                         .dt = dt,
-                        // .is_fast_object = body.velocity.getMagnitude() * dt >= tile_size,
-                        .is_fast_object = false,
+                        .is_fast_object = body.velocity.getMagnitude() * dt >= tile_size,
                     };
                 }
 

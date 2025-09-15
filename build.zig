@@ -4,13 +4,15 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const exe_mod = b.createModule(.{
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     const exe = b.addExecutable(.{
         .name = "death_perception",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
+        .root_module = exe_mod,
     });
 
     const sdl3 = b.dependency("sdl3", .{
@@ -49,6 +51,13 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addImport("sdl3", sdl3.module("sdl3"));
 
     b.installArtifact(exe);
+
+    const exe_check = b.addExecutable(.{
+        .name = "death_perception",
+        .root_module = exe_mod,
+    });
+    const check = b.step("check", "Check if death_perception compiles");
+    check.dependOn(&exe_check.step);
 
     const run_step = b.step("run", "Run the app");
 

@@ -20,7 +20,7 @@ var image_size: Vector = undefined;
 pub const Bullet = struct {
     pub const Self = @This();
 
-    pub const kind: BodyKind = .dynamic;
+    pub const kind: BodyKind = .static;
     pub const collision_shape: CollisionShape = .{ .circle = .init(Vector.zero, 4.0) };
 
     loc: Vector,

@@ -31,7 +31,7 @@ const map_size: UVector = .init(120, 77);
 const Map = @import("../map.zig").Map(map_size.x, map_size.y, Game.tile_size);
 
 const spatial_partition_factor: i32 = 4;
-const Partition = @import("../math/spatial_parition.zig").SpatialPartition(
+const Partition = @import("../math/spatial_partition.zig").SpatialPartition(
     *Entity,
     @divFloor(map_size.x, spatial_partition_factor) + 1,
     @divFloor(map_size.y, spatial_partition_factor) + 1,

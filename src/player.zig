@@ -22,7 +22,7 @@ const max_speed = 85.0 * Game.tile_size / 16.0;
 pub const Player = struct {
     pub const Self = @This();
 
-    pub const kind: BodyKind = .dynamic;
+    pub const kind: BodyKind = .static;
     pub const collision_shape: CollisionShape = .{ .circle = .init(.init(0, -7), 7.0) };
 
     loc: Vector = .zero,

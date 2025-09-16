@@ -14,6 +14,7 @@ const ui = @import("./ui/lib/component.zig");
 const TestUI = @import("./ui/test.zig");
 const MainMenu = @import("./ui/main_menu.zig");
 
+const Entity = @import("entity.zig").Entity;
 const Vector = @import("math/vector.zig").Vector(f32);
 const Color = @import("color.zig").Color;
 const Level1 = @import("./levels/level1.zig").Level1;
@@ -40,6 +41,8 @@ pub var renderer: Renderer = undefined;
 pub var camera: Camera = undefined;
 pub var bg_color: sdl.pixels.Color = .{};
 pub const tile_size: f32 = 16.0;
+
+pub var entities: std.MultiArrayList(Entity) = .empty;
 
 var level: Level1 = undefined;
 

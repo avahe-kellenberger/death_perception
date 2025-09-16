@@ -9,6 +9,7 @@ const Vector = vector_mod.Vector(f32);
 const UVector = vector_mod.Vector(usize);
 const vector = vector_mod.vector;
 const FRect = sdl.rect.FRect;
+const Array2D = @import("../array_2d.zig").Array2D;
 
 const Color = @import("../color.zig").Color;
 const collides = @import("../math/sat.zig").collides;
@@ -29,6 +30,13 @@ const map_size: UVector = .init(120, 77);
 
 const Map = @import("../map.zig").Map(map_size.x, map_size.y, Game.tile_size);
 
+const spatial_partition_factor: i32 = 4;
+const Partition = @import("../math/spatial_parition.zig").SpatialPartition(
+    *Entity,
+    @divFloor(map_size.x, spatial_partition_factor) + 1,
+    @divFloor(map_size.y, spatial_partition_factor) + 1,
+);
+
 pub const Level1 = struct {
     pub const Self = @This();
 
@@ -36,6 +44,7 @@ pub const Level1 = struct {
     var wall_tiles_image: Texture = undefined;
 
     map: Map,
+    spatial_partition: Partition,
     player: *Player,
     bullets: std.ArrayList(*Bullet) = .empty,
 
@@ -58,6 +67,7 @@ pub const Level1 = struct {
         const result: Level1 = .{
             .player = player,
             .map = .init(floor_sheet, wall_sheet, 47.0, 2),
+            .spatial_partition = .init(),
         };
 
         // Make sure the players spawns on the ground.

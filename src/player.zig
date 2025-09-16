@@ -15,16 +15,20 @@ const Track = animation.Track;
 const Keyframe = animation.Keyframe;
 const AnimationPlayer = @import("animation/animation_player.zig").AnimationPlayer;
 
+const BodyKind = @import("entity.zig").BodyKind;
+
 const max_speed = 85.0 * Game.tile_size / 16.0;
 
 pub const Player = struct {
     pub const Self = @This();
 
+    pub const kind: BodyKind = .static;
     pub const collision_shape: CollisionShape = .{ .circle = .init(.init(0, -7), 7.0) };
 
     loc: Vector = .zero,
     velocity: Vector = .zero,
     scale: Vector = .init(1, 1),
+    rotation: f32 = 0,
     image: Texture,
     image_size: Vector,
     anim_player: AnimationPlayer,

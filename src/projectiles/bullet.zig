@@ -10,6 +10,8 @@ const Input = @import("../input.zig");
 const Vector = @import("../math/vector.zig").Vector(f32);
 const CollisionShape = @import("../math/collisionshape.zig").CollisionShape;
 
+const BodyKind = @import("../entity.zig").BodyKind;
+
 const max_speed = 85.0 * Game.tile_size / 16.0;
 
 var bullet_image: ?Texture = null;
@@ -18,6 +20,7 @@ var image_size: Vector = undefined;
 pub const Bullet = struct {
     pub const Self = @This();
 
+    pub const kind: BodyKind = .dynamic;
     pub const collision_shape: CollisionShape = .{ .circle = .init(Vector.zero, 4.0) };
 
     loc: Vector,

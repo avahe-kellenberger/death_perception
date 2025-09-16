@@ -14,6 +14,8 @@ pub fn SpatialPartition(T: type, comptime width: u32, comptime height: u32) type
         // Should we maybe use a hashmap instead (or two hashmaps, for bidirectional lookup)?
         grid: Array2D(std.DoublyLinkedList, width, height),
 
+        // TODO: Support not removing fixed bodies
+
         pub fn init() Self {
             return .{ .grid = .init(.{}) };
         }

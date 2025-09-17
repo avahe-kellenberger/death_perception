@@ -362,15 +362,6 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 }
             }
 
-            // Game.fillRect(Game.camera.viewport, Color.red);
-            // Game.renderer.setDrawBlendMode(.none) catch unreachable;
-            // Game.fillRect(.{
-            //     .x = Game.camera.viewport.x + 50.0,
-            //     .y = Game.camera.viewport.y + 50.0,
-            //     .w = 100.0,
-            //     .h = Game.camera.viewport.x,
-            // }, Color.transparent);
-
             // Render wall tiles
             {
                 var iter = self.tiles.window(window);

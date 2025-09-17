@@ -189,6 +189,10 @@ pub const Line = struct {
     pub fn init(start: Vector, end: Vector) Line {
         return .{ .start = start, .end = end };
     }
+
+    pub fn middle(self: Line) Vector {
+        return self.start.add(self.end).scale(0.5);
+    }
 };
 
 /// Assumes the provided list has enough capacity to add 4 vectors.

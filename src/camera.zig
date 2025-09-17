@@ -34,6 +34,15 @@ pub const Camera = struct {
         return .{ .x = self.viewport.x, .y = self.viewport.y };
     }
 
+    pub fn verticies(self: *const Self) [4]Vector {
+        return .{
+            self.viewportLoc(),
+            .init(self.viewport.x + self.size.x, self.viewport.y),
+            .init(self.viewport.x + self.size.x, self.viewport.y + self.size.y),
+            .init(self.viewport.x, self.viewport.y + self.size.y),
+        };
+    }
+
     pub fn getScale(self: *Self) ?f32 {
         const relative_z = DEFAULT_Z - self._z;
         if (relative_z <= 0) return null;

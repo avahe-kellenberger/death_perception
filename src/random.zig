@@ -11,6 +11,7 @@ pub fn init() void {
     };
     prng = .init(seed);
     random = prng.random();
+    std.log.err("Seed: {}", .{seed});
 }
 
 pub fn rand(T: type, at_least: T, at_most: T) T {

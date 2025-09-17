@@ -12,19 +12,23 @@ pub fn SpatialPartition(T: type, comptime width: u32, comptime height: u32) type
     return struct {
         pub const Self = @This();
         // Should we maybe use a hashmap instead (or two hashmaps, for bidirectional lookup)?
-        grid: Array2D(std.DoublyLinkedList, width, height),
+        // grid: Array2D(std.DoublyLinkedList, width, height),
+        grid: std.AutoHashMap(u64, std.ArrayList(*T)),
 
         // TODO: Support not removing fixed bodies
 
         pub fn init() Self {
-            return .{ .grid = .init(.{}) };
+            return .{ .grid = .init(Game.alloc) };
         }
 
         pub fn insert(self: *Self, x: u32, y: u32, t: *T) void {
-            self.grid.get(x, y).append(.{
-                .data = t,
-                .node = .{},
-            });
+            var key: u64 = @intCast(x);
+            key <<= 32;
+            key |= y;
+
+            const entry = self.grid.getOrPut(key) catch unreachable;
+            if (!entry.found_existing) entry.value_ptr.* = .empty;
+            entry.value_ptr.append(Game.alloc, t) catch unreachable;
         }
 
         pub fn get(self: *Self, x: u32, y: u32) std.DoublyLinkedList {

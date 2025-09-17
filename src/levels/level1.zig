@@ -31,8 +31,15 @@ const map_size: UVector = .init(120, 77);
 const Map = @import("../map.zig").Map(map_size.x, map_size.y, Game.tile_size);
 
 const spatial_partition_factor: i32 = 4;
+
 const Partition = @import("../math/spatial_partition.zig").SpatialPartition(
-    *Entity,
+    Entity,
+    @divFloor(map_size.x, spatial_partition_factor) + 1,
+    @divFloor(map_size.y, spatial_partition_factor) + 1,
+);
+
+const WallsPartition = @import("../math/spatial_partition.zig").SpatialPartition(
+    CollisionShape,
     @divFloor(map_size.x, spatial_partition_factor) + 1,
     @divFloor(map_size.y, spatial_partition_factor) + 1,
 );
@@ -45,6 +52,7 @@ pub const Level1 = struct {
 
     map: Map,
     spatial_partition: Partition,
+    walls_spatial_partition: WallsPartition,
     player: *Player,
     bullets: std.ArrayList(*Bullet) = .empty,
 
@@ -64,11 +72,16 @@ pub const Level1 = struct {
 
         var player = Player.init();
 
-        const result: Level1 = .{
+        var result: Level1 = .{
             .player = player,
             .map = .init(floor_sheet, wall_sheet, 47.0, 2),
             .spatial_partition = .init(),
+            .walls_spatial_partition = .init(),
         };
+
+        // for (result.map.determineLines()) |*line| {
+        //     result.walls_spatial_partition.insert(0, 0, line);
+        // }
 
         // Make sure the players spawns on the ground.
         while (true) {

@@ -97,9 +97,23 @@ const OpenWalls = struct {
 
     fn compare(pov: Vector, l1: *Line, l2: *Line) std.math.Order {
         // TODO distance to center of walls is a temp solution
-        const d1 = pov.distanceSquared(l1.middle());
-        const d2 = pov.distanceSquared(l2.middle());
+        // const d1 = pov.distanceSquared(l1.middle());
+        // const d2 = pov.distanceSquared(l2.middle());
+        const d1 = distance(pov, l1);
+        const d2 = distance(pov, l2);
         return std.math.order(d1, d2);
+    }
+
+    fn distance(p: Vector, v: *Line) f32 {
+        const dist_squared = v.start.distanceSquared(v.end);
+        // start == end
+        if (dist_squared == 0.0) return v.start.distance(p);
+        const t: f32 = p.subtract(v.start).dotProduct(v.end.subtract(v.start)) / dist_squared;
+        if (t < 0.0) return v.start.distance(p);
+        if (t > 1.0) return v.end.distance(p);
+        // Projection is on the line segment
+        const projection = v.start.add(v.end.subtract(v.start).scale(t));
+        return p.distance(projection);
     }
 };
 

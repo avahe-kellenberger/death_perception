@@ -193,6 +193,47 @@ pub const Line = struct {
     pub fn middle(self: Line) Vector {
         return self.start.add(self.end).scale(0.5);
     }
+
+    pub fn findIntersection(self: Self, ray_origin: Vector, direction: Vector) ?Vector {
+        const v2 = self.end.subtract(self.start);
+        const v3 = direction.perpLeft();
+
+        const dot = v2.dotProduct(v3);
+        if (@abs(dot) < 0.000001) return null;
+
+        const v1 = ray_origin.subtract(self.start);
+        // Distance from ray_origin in direction where the intersection occurred
+        const t1 = v2.crossProduct(v1) / dot;
+        // 0.0 to 1.0 along the line from self.start to the intersection
+        const t2 = v1.dotProduct(v3) / dot;
+
+        if (t1 >= 0.0 and (t2 >= 0.0 and t2 <= 1.0)) {
+            return ray_origin.add(direction.scale(t1));
+            // We could also return this
+            // return self.start.add(v2.scale(t2));
+        }
+        return null;
+    }
+
+    test "test 1" {
+        const line: Line = .init(.init(4, 1), .init(1, 4));
+        const ray_origin: Vector = .init(2, 5);
+        const ray_dir: Vector = .init(0, 1);
+
+        const intersection = line.findIntersection(ray_origin, ray_dir);
+        try std.testing.expectEqual(null, intersection);
+    }
+
+    test "test 2" {
+        const line: Line = .init(.init(4, 1), .init(1, 4));
+        const ray_origin: Vector = .init(4, 2);
+        const ray_dir: Vector = .init(-1, 0);
+
+        const intersection = line.findIntersection(ray_origin, ray_dir);
+        try std.testing.expect(intersection != null);
+        try std.testing.expectEqual(3, intersection.?.x);
+        try std.testing.expectEqual(2, intersection.?.y);
+    }
 };
 
 /// Assumes the provided list has enough capacity to add 4 vectors.

@@ -88,6 +88,15 @@ pub fn Vector(T: type) type {
             }
         }
 
+        pub fn crossProduct(self: Self, other: Self) f32 {
+            const result = self.x * other.y - self.y * other.x;
+            switch (@typeInfo(T)) {
+                .float => return result,
+                .int => return @floatFromInt(result),
+                else => unreachable,
+            }
+        }
+
         pub fn negate(self: Self) Self {
             return .{ .x = -self.x, .y = -self.y };
         }

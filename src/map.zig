@@ -21,6 +21,7 @@ const Line = @import("math/collisionshape.zig").Line;
 
 const sat = @import("math/sat.zig");
 const CollisionResult = sat.CollisionResult;
+const Insets = @import("math/insets.zig").Insets;
 
 const Color = @import("color.zig").Color;
 
@@ -31,6 +32,7 @@ pub const Tile = struct {
     wall_image_index: i32 = -1,
     neighbors: NeighborTiles = .{},
     kind: TileKind = .floor,
+    insets: Insets = .zero,
 
     pub fn isBoundary(t: Tile) bool {
         return t.kind == .wall or t.kind == .corner;
@@ -311,6 +313,15 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                             e.t.kind = .inner;
                         },
                     }
+
+                    // Determine tile insets for more accurate collision and visibility
+                    e.t.insets = switch (e.t.wall_image_index) {
+                        1, 2 => .{ .top = -Game.scale, .bottom = -Game.scale }, // right wall
+                        3 => .{ .left = Game.scale, .top = Game.scale, .right = -Game.scale, .bottom = -Game.scale },
+                        4 => .{ .top = Game.scale },
+                        5 => .{ .right = Game.scale, .top = Game.scale, .left = -Game.scale, .bottom = -Game.scale },
+                        else => .zero,
+                    };
                 } else {
                     e.t.floor_image_index = switch (bitsum) {
                         3, 6, 7, 22, 23, 150 => 2,
@@ -617,16 +628,22 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             };
         }
 
-        fn isVerticalWall(self: *Self, x: usize, y: usize, neighbors: NeighborTiles) bool {
-            if (y >= height) return false;
+        fn isVerticalWall(self: *Self, x: usize, y: usize, neighbors: NeighborTiles) ?*Tile {
+            if (y >= height) return null;
             const t = self.tiles.get(x, y);
-            return t.isBoundary() and neighbors.right == t.neighbors.right and neighbors.left == t.neighbors.left;
+            if (t.isBoundary() and neighbors.right == t.neighbors.right and neighbors.left == t.neighbors.left) {
+                return t;
+            }
+            return null;
         }
 
-        fn isHorizontalWall(self: *Self, x: usize, y: usize, neighbors: NeighborTiles) bool {
-            if (x >= width) return false;
+        fn isHorizontalWall(self: *Self, x: usize, y: usize, neighbors: NeighborTiles) ?*Tile {
+            if (x >= width) return null;
             const t = self.tiles.get(x, y);
-            return t.isBoundary() and neighbors.top == t.neighbors.top and neighbors.bottom == t.neighbors.bottom;
+            if (t.isBoundary() and neighbors.top == t.neighbors.top and neighbors.bottom == t.neighbors.bottom) {
+                return t;
+            }
+            return null;
         }
 
         pub fn determineLines(self: *Self) std.ArrayList(Line) {
@@ -642,16 +659,18 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 } else {
                     // Vertical wall
                     var vertical_count: usize = 1;
-                    while (self.isVerticalWall(e.x, e.y + vertical_count, t.neighbors)) {
+                    var last_insets: *Insets = &t.insets;
+                    while (self.isVerticalWall(e.x, e.y + vertical_count, t.neighbors)) |ot| {
                         vertical_count += 1;
+                        last_insets = &ot.insets;
                     }
                     if (!t.neighbors.left) {
-                        const p1 = position(e.x, e.y);
-                        const p2 = position(e.x, e.y + vertical_count);
+                        const p1 = position(e.x, e.y).add(.init(t.insets.left, t.insets.top));
+                        const p2 = position(e.x, e.y + vertical_count).add(.init(last_insets.left, -last_insets.bottom));
                         lines.append(Game.alloc, .init(p1, p2)) catch unreachable;
                     } else if (!t.neighbors.right) {
-                        const p1 = position(e.x + 1, e.y);
-                        const p2 = position(e.x + 1, e.y + vertical_count);
+                        const p1 = position(e.x + 1, e.y).add(.init(-t.insets.right, t.insets.top));
+                        const p2 = position(e.x + 1, e.y + vertical_count).subtract(.init(last_insets.right, last_insets.bottom));
                         lines.append(Game.alloc, .init(p2, p1)) catch unreachable;
                     }
                 }
@@ -661,16 +680,18 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 } else {
                     // Horizontal wall
                     var horizontal_count: usize = 1;
-                    while (self.isHorizontalWall(e.x + horizontal_count, e.y, t.neighbors)) {
+                    var last_insets: *Insets = &t.insets;
+                    while (self.isHorizontalWall(e.x + horizontal_count, e.y, t.neighbors)) |ot| {
                         horizontal_count += 1;
+                        last_insets = &ot.insets;
                     }
                     if (!t.neighbors.top) {
-                        const p1 = position(e.x, e.y);
-                        const p2 = position(e.x + horizontal_count, e.y);
+                        const p1 = position(e.x, e.y).add(.init(t.insets.left, t.insets.top));
+                        const p2 = position(e.x + horizontal_count, e.y).add(.init(-last_insets.right, last_insets.top));
                         lines.append(Game.alloc, .init(p2, p1)) catch unreachable;
                     } else if (!t.neighbors.bottom) {
-                        const p1 = position(e.x, e.y + 1);
-                        const p2 = position(e.x + horizontal_count, e.y + 1);
+                        const p1 = position(e.x, e.y + 1).add(.init(t.insets.left, -t.insets.bottom));
+                        const p2 = position(e.x + horizontal_count, e.y + 1).subtract(.init(last_insets.right, last_insets.bottom));
                         lines.append(Game.alloc, .init(p1, p2)) catch unreachable;
                     }
                 }

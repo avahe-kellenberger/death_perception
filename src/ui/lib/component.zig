@@ -10,7 +10,7 @@ const ComponentContent = @import("./content.zig").ComponentContent;
 
 const types = @import("./types.zig");
 const StackDirection = types.StackDirection;
-const Insets = types.Insets;
+const Insets = @import("../../math/insets.zig").Insets;
 const Size = types.Size;
 
 pub const ComponentID = u32;

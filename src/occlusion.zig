@@ -78,10 +78,6 @@ const OpenWalls = struct {
         self.heap.deinit();
     }
 
-    pub fn empty(self: *const Self) bool {
-        return self.heap.count() == 0;
-    }
-
     pub fn nearest(self: *Self) ?*Line {
         return self.heap.peek();
     }
@@ -99,8 +95,22 @@ const OpenWalls = struct {
         // TODO distance to center of walls is a temp solution
         const d1 = pov.distanceSquared(l1.middle());
         const d2 = pov.distanceSquared(l2.middle());
+        // const d1 = distance(pov, l1);
+        // const d2 = distance(pov, l2);
         return std.math.order(d1, d2);
     }
+
+    // fn distance(p: Vector, v: *Line) f32 {
+    //     const dist_squared = v.start.distanceSquared(v.end);
+    //     // start == end
+    //     if (dist_squared == 0.0) return v.start.distance(p);
+    //     const t: f32 = p.subtract(v.start).dotProduct(v.end.subtract(v.start)) / dist_squared;
+    //     if (t < 0.0) return v.start.distance(p);
+    //     if (t > 1.0) return v.end.distance(p);
+    //     // Projection is on the line segment
+    //     const projection = v.start.add(v.end.subtract(v.start).scale(t));
+    //     return p.distance(projection);
+    // }
 };
 
 pub const VisibilityMesh = struct {
@@ -143,7 +153,7 @@ pub const VisibilityMesh = struct {
                 const new_closest: ?*Line = open_walls.nearest();
                 if (new_closest != closest) {
                     if (pass == 1) {
-                        mesh.addTriangle(pov, last_point, endpoint, endpoint.wall);
+                        mesh.addTriangle(pov, last_point, endpoint, closest.?);
                     }
                     last_point = endpoint;
                 }
@@ -182,9 +192,8 @@ pub const VisibilityMesh = struct {
 
     fn addVertex(self: *Self, p: Vector) void {
         const viewportLoc = Game.camera.viewportLoc();
-        const scale = Game.camera.getScale() orelse return;
         self.triangle_vertices.append(Game.alloc, .{
-            .position = @bitCast(p.subtract(viewportLoc).scale(scale)),
+            .position = @bitCast(p.subtract(viewportLoc)),
             .color = .{ .r = 0.0, .g = 0.0, .b = 0.0, .a = 0.0 },
             .tex_coord = .{ .x = 0.0, .y = 0.0 },
         }) catch unreachable;
@@ -202,16 +211,21 @@ pub const VisibilityMesh = struct {
         r.setTarget(target) catch unreachable;
         defer r.setTarget(original_target) catch unreachable;
 
-        r.setDrawColor(Color.black.sdl()) catch unreachable;
+        r.setDrawColor(Color.black.with(.{ .a = 100 }).sdl()) catch unreachable;
         r.clear() catch unreachable;
 
         r.setDrawBlendMode(.none) catch unreachable;
         r.setDrawColor(Color.transparent.sdl()) catch unreachable;
-        r.renderGeometry(
-            null,
-            self.triangle_vertices.items,
-            self.indices.items,
-        ) catch unreachable;
+        if (Game.camera.getScale()) |scale| {
+            const original_scale = r.getScale() catch unreachable;
+            r.setScale(scale, scale) catch unreachable;
+            r.renderGeometry(
+                null,
+                self.triangle_vertices.items,
+                self.indices.items,
+            ) catch unreachable;
+            r.setScale(original_scale.x, original_scale.y) catch unreachable;
+        }
     }
 
     fn cameraWalls() [4]Line {

@@ -191,7 +191,9 @@ pub const Level1 = struct {
             bullet.render();
         }
 
-        occlusion.VisibilityMesh.init(self.player.loc, self.map.lines.items).renderTo(self.occlusion_texture);
+        var mesh = occlusion.VisibilityMesh.init(self.player.loc, self.map.lines.items);
+        defer mesh.deinit();
+        mesh.renderTo(self.occlusion_texture);
         Game.renderer.renderTexture(self.occlusion_texture, null, null) catch unreachable;
 
         self.map.renderWalls();

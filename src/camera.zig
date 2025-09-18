@@ -35,13 +35,11 @@ pub const Camera = struct {
     }
 
     pub fn verticies(self: *const Self) [4]Vector {
-        // TODO: Divide by scale for rendering??
-        const scaled_size = self.size.scale(1.0 / self.getScale().?);
         return .{
-            self.viewportLoc(),
-            .init(self.viewport.x + scaled_size.x - 1.0, self.viewport.y),
-            .init(self.viewport.x + scaled_size.x - 1.0, self.viewport.y + scaled_size.y - 1.0),
-            .init(self.viewport.x, self.viewport.y + scaled_size.y - 1.0),
+            self.viewportLoc(), // top-left
+            .init(self.viewport.x + self.viewport.w, self.viewport.y), // top-right
+            .init(self.viewport.x + self.viewport.w, self.viewport.y + self.viewport.h), // bottom-right
+            .init(self.viewport.x, self.viewport.y + self.viewport.h), // bottom-left
         };
     }
 

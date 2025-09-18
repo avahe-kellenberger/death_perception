@@ -194,12 +194,15 @@ pub const Line = struct {
         return self.start.add(self.end).scale(0.5);
     }
 
-    pub fn findIntersection(self: Self, ray_origin: Vector, direction: Vector) ?Vector {
+    pub fn findIntersection(self: Self, ray_origin: Vector, direction: Vector, out: *Vector) bool {
         const v2 = self.end.subtract(self.start);
         const v3 = direction.perpLeft();
 
         const dot = v2.dotProduct(v3);
-        if (@abs(dot) < 0.000001) return null;
+        if (dot == 0) {
+            out.* = ray_origin;
+            return false;
+        }
 
         const v1 = ray_origin.subtract(self.start);
         // Distance from ray_origin in direction where the intersection occurred
@@ -207,15 +210,10 @@ pub const Line = struct {
         // 0.0 to 1.0 along the line from self.start to the intersection
         const t2 = v1.dotProduct(v3) / dot;
 
-        std.log.err("t1: {}", .{t1});
-        std.log.err("t2: {}", .{t2});
-
-        if (t1 >= 0.0 and (t2 >= 0.0 and t2 <= 1.0)) {
-            return ray_origin.add(direction.scale(t1));
-            // We could also return this
-            // return self.start.add(v2.scale(t2));
-        }
-        return null;
+        // We could also return this
+        // return self.start.add(v2.scale(t2));
+        out.* = ray_origin.add(direction.scale(t1));
+        return t1 >= 0.0 and (t2 >= 0.0 and t2 <= 1.0);
     }
 
     test {

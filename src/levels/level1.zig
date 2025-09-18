@@ -83,6 +83,7 @@ pub const Level1 = struct {
                 .width = target_size.width,
                 .height = target_size.height,
                 .access = .target,
+                .format = .{ .value = .packed_rgba_8_8_8_8 },
             }) catch unreachable,
         };
 
@@ -170,7 +171,7 @@ pub const Level1 = struct {
     }
 
     pub fn render(self: *Self) void {
-        self.map.render();
+        self.map.renderFloor();
 
         if (self.raycast_hit_data) |data| {
             Game.fillRect(
@@ -190,7 +191,10 @@ pub const Level1 = struct {
             bullet.render();
         }
 
-        occlusion.renderVisibleAreas(self.occlusion_texture, self.player.loc, self.map.lines.items);
+        occlusion.VisibilityMesh.init(self.player.loc, self.map.lines.items).renderTo(self.occlusion_texture);
+        Game.renderer.renderTexture(self.occlusion_texture, null, null) catch unreachable;
+
+        self.map.renderWalls();
     }
 
     fn getHoveredTileBounds() FRect {

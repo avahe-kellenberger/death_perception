@@ -338,17 +338,19 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             };
         }
 
-        pub fn render(self: *Self) void {
-            const window: ArrayWindow = .{
+        fn renderWindow() ArrayWindow {
+            return .{
                 .x = @as(usize, @intFromFloat(@max(0, @floor(Game.camera.viewport.x / tile_size)))),
                 .y = @as(usize, @intFromFloat(@max(0, @floor(Game.camera.viewport.y / tile_size)))),
                 .w = @as(usize, @intFromFloat(@ceil(Game.camera.viewport.w / tile_size))) + 1,
                 .h = @as(usize, @intFromFloat(@ceil(Game.camera.viewport.h / tile_size))) + 1,
             };
+        }
 
+        pub fn renderFloor(self: *Self) void {
             // Render floor tiles
             {
-                var iter = self.tiles.window(window);
+                var iter = self.tiles.window(Self.renderWindow());
                 while (iter.next()) |e| {
                     if (e.t.floor_image_index >= 0) {
                         const sprite_rect = self.floor_tiles_sheet.index(@intCast(e.t.floor_image_index));
@@ -361,10 +363,14 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                     }
                 }
             }
+        }
+
+        pub fn renderWalls(self: *Self) void {
+            const window = Self.renderWindow();
 
             // Render wall tiles
             {
-                var iter = self.tiles.window(window);
+                var iter = self.tiles.window(Self.renderWindow());
                 while (iter.next()) |e| {
                     if (e.t.wall_image_index >= 0) {
                         const sprite_rect = self.wall_tiles_sheet.index(@intCast(e.t.wall_image_index));

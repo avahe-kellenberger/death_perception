@@ -399,10 +399,10 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 }, str);
             }
 
-            Game.setRenderColor(Color.red);
-            for (self.lines.items) |line| {
-                Game.drawLine(line);
-            }
+            // Game.setRenderColor(Color.red);
+            // for (self.lines.items) |line| {
+            //     Game.drawLine(line);
+            // }
         }
 
         pub fn getPotentialArea(

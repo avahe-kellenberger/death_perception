@@ -207,6 +207,9 @@ pub const Line = struct {
         // 0.0 to 1.0 along the line from self.start to the intersection
         const t2 = v1.dotProduct(v3) / dot;
 
+        std.log.err("t1: {}", .{t1});
+        std.log.err("t2: {}", .{t2});
+
         if (t1 >= 0.0 and (t2 >= 0.0 and t2 <= 1.0)) {
             return ray_origin.add(direction.scale(t1));
             // We could also return this
@@ -215,7 +218,7 @@ pub const Line = struct {
         return null;
     }
 
-    test "test 1" {
+    test {
         const line: Line = .init(.init(4, 1), .init(1, 4));
         const ray_origin: Vector = .init(2, 5);
         const ray_dir: Vector = .init(0, 1);
@@ -224,10 +227,22 @@ pub const Line = struct {
         try std.testing.expectEqual(null, intersection);
     }
 
-    test "test 2" {
+    test {
         const line: Line = .init(.init(4, 1), .init(1, 4));
         const ray_origin: Vector = .init(4, 2);
         const ray_dir: Vector = .init(-1, 0);
+
+        const intersection = line.findIntersection(ray_origin, ray_dir);
+        try std.testing.expect(intersection != null);
+        try std.testing.expectEqual(3, intersection.?.x);
+        try std.testing.expectEqual(2, intersection.?.y);
+    }
+
+    test {
+        const line: Line = .init(.init(4, 1), .init(1, 4));
+        const ray_origin: Vector = .init(5, 4);
+        var ray_dir: Vector = .init(-10, -10);
+        ray_dir = ray_dir.normalize();
 
         const intersection = line.findIntersection(ray_origin, ray_dir);
         try std.testing.expect(intersection != null);

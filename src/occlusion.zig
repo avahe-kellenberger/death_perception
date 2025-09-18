@@ -13,48 +13,93 @@ const Endpoint = struct {
     point: Vector,
     wall: *Line,
     angle: f32,
+    is_start: bool,
 };
 
-pub fn init(target: sdl.render.Texture, pov: Vector, walls: []const Line) void {
-    const old_target = Game.renderer.getTarget();
-    defer Game.renderer.setTarget(old_target) catch unreachable;
+const TriangleVertices = struct {
+    pub const Self = @This();
 
-    Game.renderer.setTarget(target) catch unreachable;
-    Game.fillRect(Game.camera.viewport, Color.black);
-    Game.renderer.setDrawBlendMode(.none) catch unreachable;
+    vertices: std.ArrayList(Vector) = .empty,
+    indicies: std.ArrayList(c_int) = .empty,
+    triangle_vertices: std.ArrayList(sdl.render.Vertex) = .empty,
 
-    // Game.camera.viewport
+    pub fn init() Self {
+        return .{};
+    }
 
-    // Draw triangles
-    //renderer.renderGeometry(t, verts, &.{ 3, 1, 0, 2, 1, 3 }) catch unreachable;
+    pub fn deinit(self: *Self) void {
+        self.vertices.deinit(Game.alloc);
+        self.indicies.deinit(Game.alloc);
+        self.triangle_vertices.deinit(Game.alloc);
+    }
+
+    pub fn add(self: *Self, v: Vector) void {
+        self.indicies.append(Game.alloc, @intCast(self.vertices.items.len)) catch unreachable;
+        self.vertices.append(Game.alloc, v) catch unreachable;
+    }
+
+    pub fn closeTriangle(self: *Self) void {
+        std.debug.assert(self.indicies.items.len >= 3);
+
+        const num_indicies = self.indicies.items.len;
+        for (num_indicies - 3..num_indicies) |i| {
+            self.triangle_vertices.append(Game.alloc, .{
+                .position = @bitCast(self.vertices.items[@intCast(self.indicies.items[i])]),
+                .color = .{ .r = 1.0, .g = 1.0, .b = 1.0, .a = 0.0 },
+                .tex_coord = @bitCast(Vector.zero),
+            }) catch unreachable;
+        }
+    }
+
+    pub fn mostRecentPoint(self: *Self) ?Vector {
+        if (self.vertices.items.len == 0) return null;
+        return self.vertices.items[@intCast(self.indicies.getLast())];
+    }
+};
+
+fn getWalls(initial_walls: []Line) []Line {
+    var walls = std.ArrayList(Line).initCapacity(Game.alloc, initial_walls.len + 4) catch unreachable;
+    for (initial_walls) |wall| walls.appendAssumeCapacity(wall);
+
+    const camera_walls = cameraWalls();
+    inline for (camera_walls) |wall| walls.appendAssumeCapacity(wall);
+
+    return walls.toOwnedSlice(Game.alloc) catch unreachable;
+}
+
+pub fn renderVisibleAreas(target: sdl.render.Texture, pov: Vector, initial_walls: []Line) void {
+    var r = target.getRenderer() catch unreachable;
+    r.setDrawBlendMode(.none) catch unreachable;
+
+    const walls = getWalls(initial_walls);
+    defer Game.alloc.free(walls);
+
+    // Game.setRenderColor(Color.red);
+    // for (walls) |wall| {
+    //     Game.drawLine(wall);
+    // }
+    // Game.renderer.renderTexture(target, null, null) catch unreachable;
 
     // Find and sort all points by angle to pov
-    var endpoints: std.ArrayList(Endpoint) = .initCapacity(Game.alloc, 4 + walls.len * 2);
+    var endpoints = std.ArrayList(Endpoint).initCapacity(Game.alloc, walls.len * 2) catch unreachable;
     defer endpoints.deinit(Game.alloc);
 
     for (walls) |*wall| {
+        const angle_start = wall.start.subtract(pov).getAngleRadians();
+        const angle_end = wall.end.subtract(pov).getAngleRadians();
+        const angle_diff = Vector.getSignedAngleDifference(angle_start, angle_end);
+        const is_start_first = angle_diff > 0;
         endpoints.append(Game.alloc, .{
             .point = wall.start,
             .wall = wall,
-            .angle = wall.start.subtract(pov).getAngleRadians(),
+            .angle = angle_start,
+            .is_start = is_start_first,
         }) catch unreachable;
         endpoints.append(Game.alloc, .{
             .point = wall.end,
             .wall = wall,
-            .angle = wall.end.subtract(pov).getAngleRadians(),
-        }) catch unreachable;
-    }
-    const camera_walls = cameraWalls();
-    for (camera_walls) |*wall| {
-        endpoints.append(Game.alloc, .{
-            .point = wall.start,
-            .wall = wall,
-            .angle = wall.start.subtract(pov).getAngleRadians(),
-        }) catch unreachable;
-        endpoints.append(Game.alloc, .{
-            .point = wall.end,
-            .wall = wall,
-            .angle = wall.end.subtract(pov).getAngleRadians(),
+            .angle = angle_end,
+            .is_start = !is_start_first,
         }) catch unreachable;
     }
 
@@ -65,29 +110,67 @@ pub fn init(target: sdl.render.Texture, pov: Vector, walls: []const Line) void {
     defer open_walls.deinit(Game.alloc);
 
     var closest: ?*Line = null;
+    var triangles: TriangleVertices = .init();
+
     for (endpoints.items) |endpoint| {
         const wall = endpoint.wall;
-        if (endpoint.point.equals(wall.start)) {
+        if (endpoint.is_start) {
             open_walls.append(Game.alloc, wall) catch unreachable;
         } else {
+            // Closest wall closed
+            if (closest) |c| if (wall == c) {
+                if (wall.start != endpoint.point) {
+                    triangles.add(wall.start);
+                } else {
+                    triangles.add(wall.end);
+                }
+
+                triangles.add(endpoint.point);
+                triangles.add(pov);
+                triangles.closeTriangle();
+            };
+
             // Remove this wall from open walls
-            for (open_walls, 0..) |open_wall, i| {
+            for (open_walls.items, 0..) |open_wall, i| {
                 if (open_wall == endpoint.wall) {
-                    open_walls.swapRemove(i);
+                    _ = open_walls.swapRemove(i);
                     break;
                 }
             }
         }
-        const new_closest: ?*Line = findClosest(pov, open_walls.items);
-        if (new_closest != closest) closest = new_closest;
-    }
-}
 
-fn findIntersection(ray_origin: Vector, dir: Vector, wall: *Line) Vector {
-    _ = ray_origin; // autofix
-    _ = dir; // autofix
-    _ = wall; // autofix
-    return Vector.zero;
+        const new_closest: ?*Line = findClosest(pov, open_walls.items);
+        // Can be null before we find our first wall to open
+        if (new_closest == null) continue;
+
+        if (new_closest != closest) {
+            closest = new_closest;
+            // ???
+            if (closest == null) continue;
+            const c = closest.?;
+
+            // Need to check if the most recent point is the same as the new closest's start
+            if (triangles.mostRecentPoint()) |most_recent_point| {
+                if (!most_recent_point.equals(c.start)) {
+                    if (c.findIntersection(pov, most_recent_point.subtract(pov).normalize())) |intersection| {
+                        triangles.add(intersection);
+                    } else {
+                        const dir = most_recent_point.subtract(pov).normalize();
+                        std.log.err("new closest wall: {}", .{c});
+                        std.log.err("pov: {}", .{pov});
+                        std.log.err("dir: {}", .{dir});
+                        unreachable;
+                    }
+                }
+            }
+        }
+    }
+
+    Game.renderer.renderGeometry(
+        target,
+        triangles.triangle_vertices.items,
+        triangles.indicies.items,
+    ) catch unreachable;
 }
 
 fn cameraWalls() [4]Line {
@@ -114,5 +197,7 @@ fn findClosest(pov: Vector, walls: []*Line) ?*Line {
 }
 
 fn compareByAngle(_: void, e1: Endpoint, e2: Endpoint) bool {
-    return e1.angle < e2.angle;
+    if (e1.angle < e2.angle) return true;
+    if (e2.angle < e1.angle) return false;
+    return e1.is_start and !e2.is_start;
 }

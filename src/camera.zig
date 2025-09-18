@@ -30,20 +30,22 @@ pub const Camera = struct {
         return cam;
     }
 
-    pub fn viewportLoc(self: *Self) Vector {
+    pub fn viewportLoc(self: *const Self) Vector {
         return .{ .x = self.viewport.x, .y = self.viewport.y };
     }
 
     pub fn verticies(self: *const Self) [4]Vector {
+        // TODO: Divide by scale for rendering??
+        const scaled_size = self.size.scale(1.0 / self.getScale().?);
         return .{
             self.viewportLoc(),
-            .init(self.viewport.x + self.size.x, self.viewport.y),
-            .init(self.viewport.x + self.size.x, self.viewport.y + self.size.y),
-            .init(self.viewport.x, self.viewport.y + self.size.y),
+            .init(self.viewport.x + scaled_size.x - 1.0, self.viewport.y),
+            .init(self.viewport.x + scaled_size.x - 1.0, self.viewport.y + scaled_size.y - 1.0),
+            .init(self.viewport.x, self.viewport.y + scaled_size.y - 1.0),
         };
     }
 
-    pub fn getScale(self: *Self) ?f32 {
+    pub fn getScale(self: *const Self) ?f32 {
         const relative_z = DEFAULT_Z - self._z;
         if (relative_z <= 0) return null;
         return 1.0 / relative_z;

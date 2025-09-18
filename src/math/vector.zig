@@ -155,6 +155,13 @@ pub fn Vector(T: type) type {
             return std.math.radiansToDegrees(self.getAngleRadians());
         }
 
+        pub fn getSignedAngleDifference(angle1: f32, angle2: f32) f32 {
+            var diff = angle2 - angle1;
+            if (diff <= -std.math.pi) diff += std.math.tau;
+            if (diff > std.math.pi) diff -= std.math.tau;
+            return diff;
+        }
+
         pub fn equals(self: Self, other: Self) bool {
             return self.x == other.x and self.y == other.y;
         }

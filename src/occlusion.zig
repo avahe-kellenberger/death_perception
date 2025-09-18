@@ -111,6 +111,18 @@ const OpenWalls = struct {
     //     const projection = v.start.add(v.end.subtract(v.start).scale(t));
     //     return p.distance(projection);
     // }
+
+    fn distance(p: Vector, v: *Line) f32 {
+        const dist_squared = v.start.distanceSquared(v.end);
+        // start == end
+        if (dist_squared == 0.0) return v.start.distance(p);
+        const t: f32 = p.subtract(v.start).dotProduct(v.end.subtract(v.start)) / dist_squared;
+        if (t < 0.0) return v.start.distance(p);
+        if (t > 1.0) return v.end.distance(p);
+        // Projection is on the line segment
+        const projection = v.start.add(v.end.subtract(v.start).scale(t));
+        return p.distance(projection);
+    }
 };
 
 pub const VisibilityMesh = struct {

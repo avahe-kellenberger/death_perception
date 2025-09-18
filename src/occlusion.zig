@@ -119,12 +119,6 @@ pub fn renderVisibleAreas(target: sdl.render.Texture, pov: Vector, initial_walls
         } else {
             // Closest wall closed
             if (closest) |c| if (wall == c) {
-                if (wall.start != endpoint.point) {
-                    triangles.add(wall.start);
-                } else {
-                    triangles.add(wall.end);
-                }
-
                 triangles.add(endpoint.point);
                 triangles.add(pov);
                 triangles.closeTriangle();
@@ -160,6 +154,12 @@ pub fn renderVisibleAreas(target: sdl.render.Texture, pov: Vector, initial_walls
                         std.log.err("pov: {}", .{pov});
                         std.log.err("dir: {}", .{dir});
                         unreachable;
+                    }
+                } else {
+                    if (wall.start != endpoint.point) {
+                        triangles.add(wall.start);
+                    } else {
+                        triangles.add(wall.end);
                     }
                 }
             }

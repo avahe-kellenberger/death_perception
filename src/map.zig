@@ -318,7 +318,7 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                     e.t.insets = switch (e.t.wall_image_index) {
                         1, 2 => .{ .top = -Game.scale, .bottom = -Game.scale }, // right wall
                         3 => .{ .left = Game.scale, .top = Game.scale, .right = -Game.scale, .bottom = -Game.scale },
-                        4 => .{ .top = Game.scale },
+                        4 => .{ .left = -Game.scale, .top = Game.scale, .right = -Game.scale },
                         5 => .{ .right = Game.scale, .top = Game.scale, .left = -Game.scale, .bottom = -Game.scale },
                         else => .zero,
                     };

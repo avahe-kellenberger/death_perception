@@ -194,7 +194,7 @@ pub const Line = struct {
         return self.start.add(self.end).scale(0.5);
     }
 
-    pub fn findIntersection(self: Self, ray_origin: Vector, direction: Vector, out: *Vector) bool {
+    pub fn findIntersection(self: *const Self, ray_origin: Vector, direction: Vector, out: *Vector) bool {
         const v2 = self.end.subtract(self.start);
         const v3 = direction.perpLeft();
 

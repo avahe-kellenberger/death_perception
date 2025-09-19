@@ -92,36 +92,24 @@ const OpenWalls = struct {
     }
 
     fn compare(pov: Vector, l1: *Line, l2: *Line) std.math.Order {
-        // TODO distance to center of walls is a temp solution
-        const d1 = pov.distanceSquared(l1.middle());
-        const d2 = pov.distanceSquared(l2.middle());
-        // const d1 = distance(pov, l1);
-        // const d2 = distance(pov, l2);
-        return std.math.order(d1, d2);
+        var gap: f32 = 0; // negative, l1 is closer, otherwise l2 is closer
+        gap = absMax(gap, diff(l2, l1.start, pov));
+        gap = absMax(gap, diff(l2, l1.end, pov));
+        gap = absMax(gap, -diff(l1, l2.start, pov));
+        gap = absMax(gap, -diff(l1, l2.end, pov));
+        return std.math.order(gap, 0);
     }
 
-    // fn distance(p: Vector, v: *Line) f32 {
-    //     const dist_squared = v.start.distanceSquared(v.end);
-    //     // start == end
-    //     if (dist_squared == 0.0) return v.start.distance(p);
-    //     const t: f32 = p.subtract(v.start).dotProduct(v.end.subtract(v.start)) / dist_squared;
-    //     if (t < 0.0) return v.start.distance(p);
-    //     if (t > 1.0) return v.end.distance(p);
-    //     // Projection is on the line segment
-    //     const projection = v.start.add(v.end.subtract(v.start).scale(t));
-    //     return p.distance(projection);
-    // }
+    fn diff(line: *const Line, point: Vector, pov: Vector) f32 {
+        var intersection: Vector = undefined;
+        if (line.findIntersection(pov, point.subtract(pov).normalize(), &intersection)) {
+            return point.distanceSquared(pov) - intersection.distanceSquared(pov);
+        }
+        return 0;
+    }
 
-    fn distance(p: Vector, v: *Line) f32 {
-        const dist_squared = v.start.distanceSquared(v.end);
-        // start == end
-        if (dist_squared == 0.0) return v.start.distance(p);
-        const t: f32 = p.subtract(v.start).dotProduct(v.end.subtract(v.start)) / dist_squared;
-        if (t < 0.0) return v.start.distance(p);
-        if (t > 1.0) return v.end.distance(p);
-        // Projection is on the line segment
-        const projection = v.start.add(v.end.subtract(v.start).scale(t));
-        return p.distance(projection);
+    fn absMax(v1: f32, v2: f32) f32 {
+        return if (@abs(v1) > @abs(v2)) v1 else v2;
     }
 };
 

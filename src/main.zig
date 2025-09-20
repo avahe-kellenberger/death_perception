@@ -14,7 +14,7 @@ const screen_height = 900;
 
 pub fn main() !void {
     if (builtin.mode == .Debug) {
-        var debug_alloc = std.heap.DebugAllocator(.{}){};
+        var debug_alloc = std.heap.DebugAllocator(.{ .stack_trace_frames = 100 }){};
         defer _ = debug_alloc.deinit();
         Game.alloc = debug_alloc.allocator();
         try run();

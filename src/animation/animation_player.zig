@@ -21,6 +21,8 @@ pub fn AnimationPlayer(T: type) type {
         }
 
         pub fn deinit(self: *Self) void {
+            var it = self.animations.valueIterator();
+            while (it.next()) |anim| anim.deinit();
             self.animations.deinit();
         }
 

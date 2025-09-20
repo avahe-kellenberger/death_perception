@@ -64,10 +64,19 @@ pub fn Animation(E: type) type {
         }
 
         pub fn deinit(self: *Self) void {
+            for (self.i32_tracks.items) |*t| t.deinit();
             self.i32_tracks.deinit(self.alloc);
+
+            for (self.f32_tracks.items) |*t| t.deinit();
             self.f32_tracks.deinit(self.alloc);
+
+            for (self.bool_tracks.items) |*t| t.deinit();
             self.bool_tracks.deinit(self.alloc);
+
+            for (self.vector_tracks.items) |*t| t.deinit();
             self.vector_tracks.deinit(self.alloc);
+
+            for (self.ivector_tracks.items) |*t| t.deinit();
             self.ivector_tracks.deinit(self.alloc);
         }
 

@@ -17,6 +17,7 @@ const collides = @import("../math/sat.zig").collides;
 const Game = @import("../game.zig");
 const Input = @import("../input.zig");
 const Entity = @import("../entity.zig").Entity;
+const EntityList = @import("../entity.zig").EntityList;
 const Player = @import("../player.zig").Player;
 const Spritesheet = @import("../spritesheet.zig").Spritesheet;
 const CollisionShape = @import("../math/collisionshape.zig").CollisionShape;
@@ -49,10 +50,13 @@ pub const Level1 = struct {
     var floor_tiles_image: Texture = undefined;
     var wall_tiles_image: Texture = undefined;
 
+    entities: EntityList,
+    player_id: u32 = 0,
+
     map: Map,
     spatial_partition: Partition,
     walls_spatial_partition: WallsPartition,
-    player: *Player,
+    // player: Player,
     bullets: std.ArrayList(*Bullet) = .empty,
 
     // NOTE: Testing code below, can remove later
@@ -71,12 +75,32 @@ pub const Level1 = struct {
         const floor_sheet = Spritesheet.init(floor_tiles_image, 2, 3);
         const wall_sheet = Spritesheet.init(wall_tiles_image, 3, 5);
 
-        var player = Player.init();
-
         const target_size = Game.renderer.getOutputSize() catch unreachable;
-        var result: Level1 = .{
-            .player = player,
-            .map = .init(floor_sheet, wall_sheet, 47.0, 2),
+
+        // for (result.map.determineLines()) |*line| {
+        //     result.walls_spatial_partition.insert(0, 0, line);
+        // }
+
+        var map: Map = .init(floor_sheet, wall_sheet, 47.0, 2);
+
+        // Make sure the players spawns on the ground.
+        var player: Player = .init();
+        while (true) {
+            const tile_loc: UVector = .init(rand(usize, 0, map_size.x - 1), rand(usize, 0, map_size.y - 1));
+            if (map.tiles.get(tile_loc.x, tile_loc.y).kind == .floor) {
+                player.loc = .init(
+                    Map.tile_size * @as(f32, @floatFromInt(tile_loc.x)),
+                    Map.tile_size * @as(f32, @floatFromInt(tile_loc.y)),
+                );
+                break;
+            }
+        }
+        var entities: EntityList = .init();
+        const player_id = entities.add(.{ .player = player });
+        return .{
+            .entities = entities,
+            .player_id = player_id,
+            .map = map,
             .spatial_partition = .init(),
             .walls_spatial_partition = .init(),
             .occlusion_texture = sdl.render.Texture.initWithProperties(Game.renderer, .{
@@ -86,52 +110,35 @@ pub const Level1 = struct {
                 .format = .{ .value = .packed_rgba_8_8_8_8 },
             }) catch unreachable,
         };
-
-        // for (result.map.determineLines()) |*line| {
-        //     result.walls_spatial_partition.insert(0, 0, line);
-        // }
-
-        // Make sure the players spawns on the ground.
-        while (true) {
-            const tile_loc: UVector = .init(rand(usize, 0, map_size.x - 1), rand(usize, 0, map_size.y - 1));
-            if (result.map.tiles.get(tile_loc.x, tile_loc.y).kind == .floor) {
-                player.loc = .init(
-                    Map.tile_size * @as(f32, @floatFromInt(tile_loc.x)),
-                    Map.tile_size * @as(f32, @floatFromInt(tile_loc.y)),
-                );
-                break;
-            }
-        }
-
-        return result;
     }
 
     pub fn deinit(self: *Self) void {
-        self.player.deinit();
+        self.entities.remove(self.player_id);
+        // self.player.deinit();
         self.map.deinit();
         floor_tiles_image.deinit();
         wall_tiles_image.deinit();
-        Game.alloc.destroy(self.player);
     }
 
     pub fn update(self: *Self, dt: f32) void {
+        var player: *Player = &self.entities.get(self.player_id).?.player;
         {
-            var iter = Map.CollisionIterator(Player).init(&self.map, self.player, Player.collision_shape, dt);
+            var iter = Map.CollisionIterator(Player).init(&self.map, player, Player.collision_shape, dt);
             while (iter.next()) |result| {
                 // NOTE: Currently only collides with wall/corner tiles.
                 var mtv = result.getMinTranslationVector();
                 if (result.collision_owner_a) mtv = mtv.negate();
-                self.player.loc = self.player.loc.add(mtv);
+                player.loc = player.loc.add(mtv);
                 break;
             }
         }
 
-        Game.camera.centerOnPoint(self.player.loc.add(self.player.sprite_offset));
+        Game.camera.centerOnPoint(player.loc.add(player.sprite_offset));
 
         if (Input.getButtonState(.left) == .just_pressed) {
             self.raycast_hit_data = null;
 
-            const player_center = self.player.loc.add(self.player.sprite_offset);
+            const player_center = player.loc.add(player.sprite_offset);
 
             const clicked_loc = Game.camera.screenToWorld(Input.mouse.loc);
             const raycast_end_loc = player_center.add(

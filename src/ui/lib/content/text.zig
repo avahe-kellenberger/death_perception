@@ -7,7 +7,7 @@ const ttf = sdl.ttf;
 const Color = @import("../../../color.zig").Color;
 const Vector = @import("../../../math/vector.zig").Vector(f32);
 const Game = @import("../../../game.zig");
-const Insets = @import("../types.zig").Insets;
+const Insets = @import("../../../math/insets.zig").Insets;
 
 const TextContent = union(enum) {
     const Self = @This();

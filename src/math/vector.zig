@@ -88,6 +88,15 @@ pub fn Vector(T: type) type {
             }
         }
 
+        pub fn crossProduct(self: Self, other: Self) f32 {
+            const result = self.x * other.y - self.y * other.x;
+            switch (@typeInfo(T)) {
+                .float => return result,
+                .int => return @floatFromInt(result),
+                else => unreachable,
+            }
+        }
+
         pub fn negate(self: Self) Self {
             return .{ .x = -self.x, .y = -self.y };
         }
@@ -139,12 +148,22 @@ pub fn Vector(T: type) type {
         /// Gets the angle of this vector, in radians.
         /// (from -pi to pi)
         pub fn getAngleRadians(self: Self) f32 {
-            // std.math.degreesToRadians(degrees)
             return std.math.atan2(self.y, self.x);
         }
 
         pub fn getAngleDegrees(self: Self) f32 {
             return std.math.radiansToDegrees(self.getAngleRadians());
+        }
+
+        pub fn getSignedAngleDifference(angle1: f32, angle2: f32) f32 {
+            var diff = angle2 - angle1;
+            if (diff <= -std.math.pi) diff += std.math.tau;
+            if (diff > std.math.pi) diff -= std.math.tau;
+            return diff;
+        }
+
+        pub fn equals(self: Self, other: Self) bool {
+            return self.x == other.x and self.y == other.y;
         }
     };
 }

@@ -42,7 +42,8 @@ pub var state: GameState = .main_menu;
 pub var renderer: Renderer = undefined;
 pub var camera: Camera = undefined;
 pub var bg_color: sdl.pixels.Color = .{};
-pub const tile_size: f32 = 16.0 * 3.0;
+pub const scale: f32 = 3.0;
+pub const tile_size: f32 = 16.0 * scale;
 
 pub var entities: std.MultiArrayList(Entity) = .empty;
 
@@ -134,8 +135,8 @@ pub fn render() void {
             // TODO
         },
         .in_game => {
-            if (camera.getScale()) |scale| {
-                renderer.setScale(scale, scale) catch unreachable;
+            if (camera.getScale()) |s| {
+                renderer.setScale(s, s) catch unreachable;
 
                 level.render();
 

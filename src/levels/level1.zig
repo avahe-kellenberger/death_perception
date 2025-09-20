@@ -22,22 +22,21 @@ const Spritesheet = @import("../spritesheet.zig").Spritesheet;
 const CollisionShape = @import("../math/collisionshape.zig").CollisionShape;
 const rand = @import("../random.zig").rand;
 
+const occlusion = @import("../occlusion.zig");
+
 const Bullet = @import("../projectiles/bullet.zig").Bullet;
 
 const TileData = @import("../map.zig").TileData;
 
 const map_size: UVector = .init(120, 77);
-
 const Map = @import("../map.zig").Map(map_size.x, map_size.y, Game.tile_size);
 
 const spatial_partition_factor: i32 = 4;
-
 const Partition = @import("../math/spatial_partition.zig").SpatialPartition(
     Entity,
     @divFloor(map_size.x, spatial_partition_factor) + 1,
     @divFloor(map_size.y, spatial_partition_factor) + 1,
 );
-
 const WallsPartition = @import("../math/spatial_partition.zig").SpatialPartition(
     CollisionShape,
     @divFloor(map_size.x, spatial_partition_factor) + 1,
@@ -59,6 +58,8 @@ pub const Level1 = struct {
     // NOTE: Testing code below, can remove later
     raycast_hit_data: ?TileData = null,
 
+    occlusion_texture: Texture,
+
     pub fn init() Level1 {
         // Map floor color so we can ignore drawing "empty" tiles
         Game.bg_color = .{ .r = 139, .g = 155, .b = 180, .a = 255 };
@@ -72,11 +73,18 @@ pub const Level1 = struct {
 
         var player = Player.init();
 
+        const target_size = Game.renderer.getOutputSize() catch unreachable;
         var result: Level1 = .{
             .player = player,
             .map = .init(floor_sheet, wall_sheet, 47.0, 2),
             .spatial_partition = .init(),
             .walls_spatial_partition = .init(),
+            .occlusion_texture = sdl.render.Texture.initWithProperties(Game.renderer, .{
+                .width = target_size.width,
+                .height = target_size.height,
+                .access = .target,
+                .format = .{ .value = .packed_rgba_8_8_8_8 },
+            }) catch unreachable,
         };
 
         // for (result.map.determineLines()) |*line| {
@@ -163,7 +171,7 @@ pub const Level1 = struct {
     }
 
     pub fn render(self: *Self) void {
-        self.map.render();
+        self.map.renderFloor();
 
         if (self.raycast_hit_data) |data| {
             Game.fillRect(
@@ -182,6 +190,13 @@ pub const Level1 = struct {
         for (self.bullets.items) |bullet| {
             bullet.render();
         }
+
+        var mesh = occlusion.VisibilityMesh.init(self.player.loc, self.map.lines.items);
+        defer mesh.deinit();
+        mesh.renderTo(self.occlusion_texture);
+        Game.renderer.renderTexture(self.occlusion_texture, null, null) catch unreachable;
+
+        self.map.renderWalls();
     }
 
     fn getHoveredTileBounds() FRect {

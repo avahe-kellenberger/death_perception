@@ -123,6 +123,7 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
         }
 
         pub fn deinit(self: *Self) void {
+            self.lines.deinit(Game.alloc);
             Game.alloc.destroy(self.tiles);
         }
 

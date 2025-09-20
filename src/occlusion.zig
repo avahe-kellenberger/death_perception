@@ -50,7 +50,7 @@ const Endpoints = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        Game.alloc.free(self.list);
+        Game.alloc.free(self.items);
     }
 
     fn compare(_: void, e1: Endpoint, e2: Endpoint) bool {
@@ -129,7 +129,8 @@ pub const VisibilityMesh = struct {
         const walls = getWalls(initial_walls);
         defer Game.alloc.free(walls);
 
-        const endpoints: Endpoints = .init(pov, walls);
+        var endpoints: Endpoints = .init(pov, walls);
+        defer endpoints.deinit();
 
         var open_walls: OpenWalls = .init(pov, walls.len);
         defer open_walls.deinit();

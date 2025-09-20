@@ -61,6 +61,12 @@ comptime {
         assert(@TypeOf(@field(entity_field.type, "kind")) == BodyKind);
         assert(@TypeOf(@field(entity_field.type, "collision_shape")) == CollisionShape);
 
+        // Fields
+        assert(@FieldType(entity_field.type, "loc") == Vector(f32));
+        assert(@FieldType(entity_field.type, "velocity") == Vector(f32));
+        assert(@FieldType(entity_field.type, "scale") == Vector(f32));
+        assert(@FieldType(entity_field.type, "rotation") == f32);
+
         // Functions
         const update_fn = @typeInfo(@TypeOf(@field(entity_field.type, "update"))).@"fn";
         assert(update_fn.return_type.? == void);
@@ -68,11 +74,10 @@ comptime {
         assert(update_fn.params[0].type.? == *entity_field.type);
         assert(update_fn.params[1].type.? == f32);
 
-        // Fields
-        assert(@FieldType(entity_field.type, "loc") == Vector(f32));
-        assert(@FieldType(entity_field.type, "velocity") == Vector(f32));
-        assert(@FieldType(entity_field.type, "scale") == Vector(f32));
-        assert(@FieldType(entity_field.type, "rotation") == f32);
+        const render_fn = @typeInfo(@TypeOf(@field(entity_field.type, "render"))).@"fn";
+        assert(render_fn.return_type.? == void);
+        assert(render_fn.params.len == 1);
+        assert(render_fn.params[0].type.? == *entity_field.type);
     }
 }
 
@@ -95,9 +100,17 @@ pub const EntityList = struct {
         self.current_id = 0;
     }
 
-    pub fn add(self: *Self, e: Entity) u32 {
-        self.entities.put(self.current_id, e) catch unreachable;
+    pub fn add(self: *Self, e: anytype) u32 {
         defer self.current_id += 2;
+        comptime var found: bool = false;
+        inline for (@typeInfo(Entity).@"union".fields) |f| {
+            if (f.type == @TypeOf(e)) {
+                self.entities.put(self.current_id, @unionInit(Entity, f.name, e)) catch unreachable;
+                found = true;
+                break;
+            }
+        }
+        comptime if (!found) @compileError("Invalid Entity type " ++ @typeName(@TypeOf(e)));
         return self.current_id;
     }
 

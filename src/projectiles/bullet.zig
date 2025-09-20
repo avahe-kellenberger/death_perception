@@ -28,7 +28,7 @@ pub const Bullet = struct {
     velocity: Vector,
     rotation: f32,
 
-    pub fn init(loc: Vector, velocity: Vector) *Bullet {
+    pub fn init(loc: Vector, velocity: Vector) Bullet {
         if (bullet_image == null) {
             bullet_image = Game.loadTexture("./assets/images/bullet2.png", .nearest);
             image_size = .{
@@ -37,13 +37,11 @@ pub const Bullet = struct {
             };
         }
 
-        const res: *Bullet = Game.alloc.create(Bullet) catch unreachable;
-        res.* = .{
+        return .{
             .loc = loc,
             .velocity = velocity,
             .rotation = velocity.getAngleDegrees(),
         };
-        return res;
     }
 
     pub fn deinit(_: *Self) void {}

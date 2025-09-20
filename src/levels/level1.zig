@@ -51,17 +51,16 @@ pub const Level1 = struct {
     var wall_tiles_image: Texture = undefined;
 
     entities: EntityList,
+    entities_to_remove: std.ArrayList(u32) = .empty,
+
     player_id: u32 = 0,
 
     map: Map,
     spatial_partition: Partition,
     walls_spatial_partition: WallsPartition,
-    // player: Player,
-    bullets: std.ArrayList(*Bullet) = .empty,
 
     // NOTE: Testing code below, can remove later
     raycast_hit_data: ?TileData = null,
-
     occlusion_texture: Texture,
 
     pub fn init() Level1 {
@@ -96,7 +95,7 @@ pub const Level1 = struct {
             }
         }
         var entities: EntityList = .init();
-        const player_id = entities.add(.{ .player = player });
+        const player_id = entities.add(player);
         return .{
             .entities = entities,
             .player_id = player_id,
@@ -115,30 +114,45 @@ pub const Level1 = struct {
     pub fn deinit(self: *Self) void {
         self.entities.remove(self.player_id);
         self.entities.deinit();
+        self.entities_to_remove.deinit(Game.alloc);
         self.map.deinit();
         floor_tiles_image.deinit();
         wall_tiles_image.deinit();
     }
 
     pub fn update(self: *Self, dt: f32) void {
-        var player = self.entities.getAs(.player, self.player_id).?;
         {
-            var iter = Map.CollisionIterator(Player).init(&self.map, player, Player.collision_shape, dt);
-            while (iter.next()) |result| {
-                // NOTE: Currently only collides with wall/corner tiles.
-                var mtv = result.getMinTranslationVector();
-                if (result.collision_owner_a) mtv = mtv.negate();
-                player.loc = player.loc.add(mtv);
-                break;
+            var entity_iter = self.entities.entities.iterator();
+            while (entity_iter.next()) |kv| switch (kv.value_ptr.*) {
+                .player => |*player| {
+                    player.update(dt);
+                    var iter = Map.CollisionIterator(Player).init(&self.map, player, Player.collision_shape, dt);
+                    while (iter.next()) |result| {
+                        var mtv = result.getMinTranslationVector();
+                        if (result.collision_owner_a) mtv = mtv.negate();
+                        player.loc = player.loc.add(mtv);
+                        break;
+                    }
+                    Game.camera.centerOnPoint(player.loc.add(player.sprite_offset));
+                },
+                .bullet => |*bullet| {
+                    bullet.update(dt);
+                    var iter = Map.CollisionIterator(Bullet).init(&self.map, bullet, Bullet.collision_shape, dt);
+                    if (iter.next()) |_| {
+                        self.entities_to_remove.append(Game.alloc, kv.key_ptr.*) catch unreachable;
+                    }
+                },
+            };
+
+            while (self.entities_to_remove.pop()) |id| {
+                self.entities.remove(id);
             }
         }
-
-        Game.camera.centerOnPoint(player.loc.add(player.sprite_offset));
 
         if (Input.getButtonState(.left) == .just_pressed) {
             self.raycast_hit_data = null;
 
-            const player_center = player.loc.add(player.sprite_offset);
+            const player_center = Game.camera._loc;
 
             const clicked_loc = Game.camera.screenToWorld(Input.mouse.loc);
             const raycast_end_loc = player_center.add(
@@ -159,28 +173,14 @@ pub const Level1 = struct {
                 player_center,
                 clicked_loc.subtract(player_center).normalize().scale(300.0),
             );
-            self.bullets.append(Game.alloc, bullet) catch unreachable;
+            _ = self.entities.add(bullet);
         }
-
-        var bullets_to_delete = std.ArrayList(usize).empty;
-        defer bullets_to_delete.deinit(Game.alloc);
-
-        for (self.bullets.items, 0..) |bullet, i| {
-            var iter = Map.CollisionIterator(Bullet).init(&self.map, bullet, Bullet.collision_shape, dt);
-            while (iter.next()) |_| {
-                // NOTE: Currently only collides with wall/corner tiles.
-                bullets_to_delete.append(Game.alloc, i) catch unreachable;
-                break;
-            }
-        }
-
-        self.bullets.orderedRemoveMany(bullets_to_delete.items);
     }
 
     pub fn render(self: *Self) void {
         self.map.renderFloor();
 
-        var player = self.entities.getAs(.player, self.player_id).?;
+        const player = self.entities.getAs(.player, self.player_id).?;
         if (self.raycast_hit_data) |data| {
             Game.fillRect(
                 .{
@@ -193,10 +193,12 @@ pub const Level1 = struct {
             );
             Game.fillRect(.{ .x = data.x, .y = data.y, .w = 1, .h = 1 }, Color.green);
         }
-        player.render();
 
-        for (self.bullets.items) |bullet| {
-            bullet.render();
+        {
+            var iter = self.entities.entities.iterator();
+            while (iter.next()) |kv| switch (kv.value_ptr.*) {
+                inline else => |*foo| foo.render(),
+            };
         }
 
         var mesh = occlusion.VisibilityMesh.init(player.loc, self.map.lines.items);

@@ -46,9 +46,7 @@ pub const Bullet = struct {
         return res;
     }
 
-    pub fn deinit(self: *Self) void {
-        Game.alloc.free(self);
-    }
+    pub fn deinit(_: *Self) void {}
 
     pub fn update(self: *Self, dt: f32) void {
         self.loc.x += self.velocity.x * dt;

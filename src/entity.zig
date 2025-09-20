@@ -26,8 +26,8 @@ pub const Entity = union(enum) {
     bullet: Bullet,
 
     pub fn deinit(self: *Self) void {
-        switch (self) {
-            inline else => |e| e.deinit(),
+        switch (self.*) {
+            inline else => |*e| e.deinit(),
         }
     }
 };
@@ -37,53 +37,44 @@ fn strEquals(s1: []const u8, s2: []const u8) bool {
 }
 
 // Comptime assertions for all Entity types.
-// comptime {
-//     // Example:
-//     // const MyEntity = struct {
-//     //     pub const Self = @This();
-//     //     pub const kind: BodyKind = .dynamic;
-//     //     pub const collision_shape: CollisionShape = .{ .circle = .init(Vector.zero, 4.0) };
-//     //
-//     //     kind: BodyKind,
-//     //     loc: Vector(f32),
-//     //     scale: Vector(f32),
-//     //
-//     //     pub fn update(self: *Self, dt: f32) void {
-//     //         _ = self;
-//     //         _ = dt;
-//     //     }
-//     // };
-//
-//     const assert = std.debug.assert;
-//     for (@typeInfo(Entity).@"union".fields) |entity_field| {
-//         // Decls
-//         assert(@TypeOf(@field(entity_field.type, "kind")) == BodyKind);
-//         assert(@TypeOf(@field(entity_field.type, "collision_shape")) == CollisionShape);
-//
-//         // Functions
-//         const update_fn = @typeInfo(@TypeOf(@field(entity_field.type, "update"))).@"fn";
-//         assert(update_fn.return_type.? == void);
-//         assert(update_fn.params.len == 2);
-//         assert(update_fn.params[0].type.? == *entity_field.type);
-//         assert(update_fn.params[1].type.? == f32);
-//
-//         // Fields
-//         assert(@hasField(entity_field.type, "id"));
-//         for (@typeInfo(entity_field.type).@"struct".fields) |field| {
-//             if (strEquals(field.name, "id")) {
-//                 assert(field.type == u32);
-//             } else if (strEquals(field.name, "loc")) {
-//                 assert(field.type == Vector(f32));
-//             } else if (strEquals(field.name, "scale")) {
-//                 assert(field.type == Vector(f32));
-//             } else if (strEquals(field.name, "velocity")) {
-//                 assert(field.type == Vector(f32));
-//             } else if (strEquals(field.name, "rotation")) {
-//                 assert(field.type == f32);
-//             }
-//         }
-//     }
-// }
+comptime {
+    // Example:
+    // const MyEntity = struct {
+    //     pub const Self = @This();
+    //     pub const kind: BodyKind = .dynamic;
+    //     pub const collision_shape: CollisionShape = .{ .circle = .init(Vector.zero, 4.0) };
+    //
+    //     loc: Vector(f32),
+    //     velocity: Vector(f32),
+    //     scale: Vector(f32),
+    //     rotation: f32,
+    //
+    //     pub fn update(self: *Self, dt: f32) void {
+    //         _ = self;
+    //         _ = dt;
+    //     }
+    // };
+
+    const assert = std.debug.assert;
+    for (@typeInfo(Entity).@"union".fields) |entity_field| {
+        // Decls
+        assert(@TypeOf(@field(entity_field.type, "kind")) == BodyKind);
+        assert(@TypeOf(@field(entity_field.type, "collision_shape")) == CollisionShape);
+
+        // Functions
+        const update_fn = @typeInfo(@TypeOf(@field(entity_field.type, "update"))).@"fn";
+        assert(update_fn.return_type.? == void);
+        assert(update_fn.params.len == 2);
+        assert(update_fn.params[0].type.? == *entity_field.type);
+        assert(update_fn.params[1].type.? == f32);
+
+        // Fields
+        assert(@FieldType(entity_field.type, "loc") == Vector(f32));
+        assert(@FieldType(entity_field.type, "velocity") == Vector(f32));
+        assert(@FieldType(entity_field.type, "scale") == Vector(f32));
+        assert(@FieldType(entity_field.type, "rotation") == f32);
+    }
+}
 
 pub const EntityList = struct {
     pub const Self = @This();
@@ -114,7 +105,7 @@ pub const EntityList = struct {
         return self.entities.getPtr(id);
     }
 
-    pub fn getAs(self: *Self, tag: std.meta.Tag(Entity), id: u32) ?*std.meta.TagPayload(Entity, tag) {
+    pub fn getAs(self: *Self, comptime tag: std.meta.Tag(Entity), id: u32) ?*std.meta.TagPayload(Entity, tag) {
         if (self.entities.getPtr(id)) |ptr| {
             return &@field(ptr, @tagName(tag));
         }
@@ -123,11 +114,8 @@ pub const EntityList = struct {
 
     pub fn remove(self: *Self, id: u32) void {
         if (self.entities.fetchSwapRemove(id)) |kv| {
-            // TODO: ytho
-            var foo = kv;
-            foo.value.deinit();
-            // var val: *Entity = &(kv.value);
-            // &(kv.value).deinit();
+            var tmp = kv.value;
+            tmp.deinit();
         }
     }
 };

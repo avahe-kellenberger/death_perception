@@ -121,7 +121,7 @@ pub const Level1 = struct {
     }
 
     pub fn update(self: *Self, dt: f32) void {
-        var player: *Player = &self.entities.get(self.player_id).?.player;
+        var player = self.entities.getAs(.player, self.player_id).?;
         {
             var iter = Map.CollisionIterator(Player).init(&self.map, player, Player.collision_shape, dt);
             while (iter.next()) |result| {
@@ -180,6 +180,7 @@ pub const Level1 = struct {
     pub fn render(self: *Self) void {
         self.map.renderFloor();
 
+        var player = self.entities.getAs(.player, self.player_id).?;
         if (self.raycast_hit_data) |data| {
             Game.fillRect(
                 .{
@@ -192,13 +193,13 @@ pub const Level1 = struct {
             );
             Game.fillRect(.{ .x = data.x, .y = data.y, .w = 1, .h = 1 }, Color.green);
         }
-        self.player.render();
+        player.render();
 
         for (self.bullets.items) |bullet| {
             bullet.render();
         }
 
-        var mesh = occlusion.VisibilityMesh.init(self.player.loc, self.map.lines.items);
+        var mesh = occlusion.VisibilityMesh.init(player.loc, self.map.lines.items);
         defer mesh.deinit();
         mesh.renderTo(self.occlusion_texture);
         Game.renderer.renderTexture(self.occlusion_texture, null, null) catch unreachable;

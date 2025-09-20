@@ -88,7 +88,7 @@ pub const EntityList = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        for (self.entities.values()) |v| {
+        for (self.entities.values()) |*v| {
             v.deinit();
         }
         self.entities.deinit();

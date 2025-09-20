@@ -114,7 +114,7 @@ pub const Level1 = struct {
 
     pub fn deinit(self: *Self) void {
         self.entities.remove(self.player_id);
-        // self.player.deinit();
+        self.entities.deinit();
         self.map.deinit();
         floor_tiles_image.deinit();
         wall_tiles_image.deinit();

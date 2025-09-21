@@ -24,7 +24,6 @@ pub const Player = struct {
 
     pub const kind: BodyKind = .static;
     pub const collision_shape: CollisionShape = .{ .circle = .init(.init(0, -7), 7.0) };
-    // pub const collision_shape: CollisionShape = .{ .aabb = .init(.init(-8, -15), .init(7.0, -1)) };
 
     loc: Vector = .zero,
     velocity: Vector = .zero,
@@ -45,33 +44,33 @@ pub const Player = struct {
         const image = Game.loadTexture("./assets/images/player.png", .nearest);
 
         // Create idle animation
-        // var idle_anim: Animation(Player) = .init(Game.alloc, 1.8);
-        // idle_anim.addTrack(Vector, Track(Player, Vector).init(
-        //     Game.alloc,
-        //     &getScale,
-        //     &.{
-        //         .{ .value = .init(1, 1), .time = 0.0 },
-        //         .{ .value = .init(1.0, 1.1), .time = 0.7 },
-        //         .{ .value = .init(1, 1), .time = 1.8 },
-        //     },
-        //     .{},
-        // ));
-        //
-        // idle_anim.addTrack(f32, .init(
-        //     Game.alloc,
-        //     &getSkew,
-        //     &.{
-        //         .{ .value = 0, .time = 0.0 },
-        //         .{ .value = 0.0112, .time = 0.3 },
-        //         .{ .value = 0, .time = 1.8 },
-        //     },
-        //     .{},
-        // ));
+        var idle_anim: Animation(Player) = .init(Game.alloc, 1.8);
+        idle_anim.addTrack(Vector, Track(Player, Vector).init(
+            Game.alloc,
+            &getScale,
+            &.{
+                .{ .value = .init(1, 1), .time = 0.0 },
+                .{ .value = .init(1.0, 1.1), .time = 0.7 },
+                .{ .value = .init(1, 1), .time = 1.8 },
+            },
+            .{},
+        ));
 
-        const anim_player: AnimationPlayer(Self) = .init();
-        // anim_player.addAnimation("idle", idle_anim);
-        // anim_player.setAnimation("idle");
-        // anim_player.looping = true;
+        idle_anim.addTrack(f32, .init(
+            Game.alloc,
+            &getSkew,
+            &.{
+                .{ .value = 0, .time = 0.0 },
+                .{ .value = 0.0112, .time = 0.3 },
+                .{ .value = 0, .time = 1.8 },
+            },
+            .{},
+        ));
+
+        var anim_player: AnimationPlayer(Self) = .init();
+        anim_player.addAnimation("idle", idle_anim);
+        anim_player.setAnimation("idle");
+        anim_player.looping = true;
 
         return .{ // init with defaults
             .image = image,

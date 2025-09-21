@@ -42,12 +42,12 @@ pub var state: GameState = .main_menu;
 pub var renderer: Renderer = undefined;
 pub var camera: Camera = undefined;
 pub var bg_color: sdl.pixels.Color = .{};
-pub const scale: f32 = 3.0;
+pub const scale: f32 = 1.0;
 pub const tile_size: f32 = 16.0 * scale;
 
-pub var entities: std.MultiArrayList(Entity) = .empty;
-
 var level: Level1 = undefined;
+
+pub var is_server: bool = false;
 
 pub fn init(_alloc: Allocator, _renderer: Renderer, _camera: Camera) void {
     alloc = _alloc;

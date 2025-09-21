@@ -17,7 +17,8 @@ pub fn build(b: *std.Build) void {
 
     const sdl3 = b.dependency("sdl3", .{
         .target = target,
-        .optimize = optimize,
+        // .optimize = optimize,
+        .optimize = .ReleaseFast,
         // Lib options.
         // .callbacks = false,
         .ext_image = true,

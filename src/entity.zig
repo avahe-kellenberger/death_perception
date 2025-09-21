@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const Game = @import("game.zig");
+
 const Vector = @import("math/vector.zig").Vector;
 
 const CollisionShape = @import("math/collisionshape.zig").CollisionShape;
@@ -19,8 +21,15 @@ pub const BodyKind = enum {
 };
 
 pub const Entity = union(enum) {
+    pub const Self = @This();
     player: Player,
     bullet: Bullet,
+
+    pub fn deinit(self: *Self) void {
+        switch (self.*) {
+            inline else => |*e| e.deinit(),
+        }
+    }
 };
 
 fn strEquals(s1: []const u8, s2: []const u8) bool {
@@ -35,9 +44,10 @@ comptime {
     //     pub const kind: BodyKind = .dynamic;
     //     pub const collision_shape: CollisionShape = .{ .circle = .init(Vector.zero, 4.0) };
     //
-    //     kind: BodyKind,
     //     loc: Vector(f32),
+    //     velocity: Vector(f32),
     //     scale: Vector(f32),
+    //     rotation: f32,
     //
     //     pub fn update(self: *Self, dt: f32) void {
     //         _ = self;
@@ -51,6 +61,12 @@ comptime {
         assert(@TypeOf(@field(entity_field.type, "kind")) == BodyKind);
         assert(@TypeOf(@field(entity_field.type, "collision_shape")) == CollisionShape);
 
+        // Fields
+        assert(@FieldType(entity_field.type, "loc") == Vector(f32));
+        assert(@FieldType(entity_field.type, "velocity") == Vector(f32));
+        assert(@FieldType(entity_field.type, "scale") == Vector(f32));
+        assert(@FieldType(entity_field.type, "rotation") == f32);
+
         // Functions
         const update_fn = @typeInfo(@TypeOf(@field(entity_field.type, "update"))).@"fn";
         assert(update_fn.return_type.? == void);
@@ -58,17 +74,61 @@ comptime {
         assert(update_fn.params[0].type.? == *entity_field.type);
         assert(update_fn.params[1].type.? == f32);
 
-        // Fields
-        for (@typeInfo(entity_field.type).@"struct".fields) |field| {
-            if (strEquals(field.name, "loc")) {
-                assert(field.type == Vector(f32));
-            } else if (strEquals(field.name, "scale")) {
-                assert(field.type == Vector(f32));
-            } else if (strEquals(field.name, "velocity")) {
-                assert(field.type == Vector(f32));
-            } else if (strEquals(field.name, "rotation")) {
-                assert(field.type == f32);
-            }
-        }
+        const render_fn = @typeInfo(@TypeOf(@field(entity_field.type, "render"))).@"fn";
+        assert(render_fn.return_type.? == void);
+        assert(render_fn.params.len == 1);
+        assert(render_fn.params[0].type.? == *entity_field.type);
     }
 }
+
+pub const EntityList = struct {
+    pub const Self = @This();
+
+    entities: std.AutoArrayHashMap(u32, Entity),
+    // NOTE: even ids are client side, odd are server side.
+    current_id: u32 = 0,
+
+    pub fn init() EntityList {
+        return .{ .entities = .init(Game.alloc) };
+    }
+
+    pub fn deinit(self: *Self) void {
+        for (self.entities.values()) |*v| {
+            v.deinit();
+        }
+        self.entities.deinit();
+        self.current_id = 0;
+    }
+
+    pub fn add(self: *Self, e: anytype) u32 {
+        defer self.current_id += 2;
+        comptime var found: bool = false;
+        inline for (@typeInfo(Entity).@"union".fields) |f| {
+            if (f.type == @TypeOf(e)) {
+                self.entities.put(self.current_id, @unionInit(Entity, f.name, e)) catch unreachable;
+                found = true;
+                break;
+            }
+        }
+        comptime if (!found) @compileError("Invalid Entity type " ++ @typeName(@TypeOf(e)));
+        return self.current_id;
+    }
+
+    pub fn get(self: *Self, id: u32) ?*Entity {
+        return self.entities.getPtr(id);
+    }
+
+    pub fn getAs(self: *Self, comptime tag: std.meta.Tag(Entity), id: u32) ?*std.meta.TagPayload(Entity, tag) {
+        if (self.entities.getPtr(id)) |ptr| {
+            return &@field(ptr, @tagName(tag));
+        }
+        return null;
+    }
+
+    pub fn remove(self: *Self, id: u32) void {
+        if (self.entities.fetchSwapRemove(id)) |kv| {
+            var tmp = kv.value;
+            tmp.deinit();
+        }
+    }
+};

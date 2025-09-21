@@ -31,8 +31,8 @@ pub const Player = struct {
     rotation: f32 = 0,
     image: Texture,
     image_size: Vector,
-    anim_player: AnimationPlayer,
-    sprite_offset: Vector = .zero,
+    anim_player: AnimationPlayer(Self),
+    sprite_offset: Vector,
     /// Range from -1 to 1; 0 means no skewing.
     sprite_skew: f32 = 0,
     sprite_flip: struct {
@@ -40,54 +40,58 @@ pub const Player = struct {
         vertical: bool = false,
     },
 
-    pub fn init() *Player {
+    pub fn init() Player {
         const image = Game.loadTexture("./assets/images/player.png", .nearest);
 
-        var player: *Player = Game.alloc.create(Player) catch unreachable;
-        player.* = .{ // init with defaults
+        // Create idle animation
+        var idle_anim: Animation(Player) = .init(Game.alloc, 1.8);
+        idle_anim.addTrack(Vector, Track(Player, Vector).init(
+            Game.alloc,
+            &getScale,
+            &.{
+                .{ .value = .init(1, 1), .time = 0.0 },
+                .{ .value = .init(1.0, 1.1), .time = 0.7 },
+                .{ .value = .init(1, 1), .time = 1.8 },
+            },
+            .{},
+        ));
+
+        idle_anim.addTrack(f32, .init(
+            Game.alloc,
+            &getSkew,
+            &.{
+                .{ .value = 0, .time = 0.0 },
+                .{ .value = 0.0112, .time = 0.3 },
+                .{ .value = 0, .time = 1.8 },
+            },
+            .{},
+        ));
+
+        var anim_player: AnimationPlayer(Self) = .init();
+        anim_player.addAnimation("idle", idle_anim);
+        anim_player.setAnimation("idle");
+        anim_player.looping = true;
+
+        return .{ // init with defaults
             .image = image,
             .image_size = .{ .x = Game.tile_size, .y = Game.tile_size },
             .sprite_offset = .init(0, -8),
-            .anim_player = .init(Game.alloc),
+            .anim_player = anim_player,
             .sprite_flip = .{},
         };
-
-        // Create idle animation
-        {
-            var idle_anim: Animation = .init(Game.alloc, 1.8);
-            idle_anim.addTrack(Vector, .init(
-                Game.alloc,
-                &player.scale,
-                &.{
-                    .{ .value = .init(1, 1), .time = 0.0 },
-                    .{ .value = .init(1.0, 1.1), .time = 0.7 },
-                    .{ .value = .init(1, 1), .time = 1.8 },
-                },
-                .{},
-            ));
-
-            idle_anim.addTrack(f32, .init(
-                Game.alloc,
-                &player.sprite_skew,
-                &.{
-                    .{ .value = 0, .time = 0.0 },
-                    .{ .value = 0.0112, .time = 0.3 },
-                    .{ .value = 0, .time = 1.8 },
-                },
-                .{},
-            ));
-
-            player.anim_player.addAnimation("idle", idle_anim);
-            player.anim_player.setAnimation("idle");
-            player.anim_player.looping = true;
-        }
-
-        return player;
     }
 
     pub fn deinit(self: *Self) void {
         self.image.deinit();
         self.anim_player.deinit();
+    }
+
+    pub fn getScale(self: *Self) *Vector {
+        return &self.scale;
+    }
+
+    pub fn getSkew(self: *Self) *f32 {
+        return &self.sprite_skew;
     }
 
     pub fn update(self: *Self, dt: f32) void {
@@ -106,10 +110,11 @@ pub const Player = struct {
 
         self.velocity = self.velocity.maxMagnitude(max_speed);
 
-        self.loc.x += self.velocity.x * dt;
-        self.loc.y += self.velocity.y * dt;
+        // NOTE: Entities should set velocity, but not move their positions.
+        // self.loc.x += self.velocity.x * dt;
+        // self.loc.y += self.velocity.y * dt;
 
-        self.anim_player.update(dt);
+        self.anim_player.update(self, dt);
     }
 
     pub fn render(self: *Self) void {

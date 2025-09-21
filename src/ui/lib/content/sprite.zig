@@ -29,6 +29,7 @@ const SpriteTiles = struct {
     }
 
     pub fn deinit(self: *Self) void {
+        for (self.coords) |coord| Game.alloc.free(coord);
         Game.alloc.free(self.coords);
         self.coords = &.{};
     }

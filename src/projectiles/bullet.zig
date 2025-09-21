@@ -28,7 +28,7 @@ pub const Bullet = struct {
     velocity: Vector,
     rotation: f32,
 
-    pub fn init(loc: Vector, velocity: Vector) *Bullet {
+    pub fn init(loc: Vector, velocity: Vector) Bullet {
         if (bullet_image == null) {
             bullet_image = Game.loadTexture("./assets/images/bullet2.png", .nearest);
             image_size = .{
@@ -37,22 +37,21 @@ pub const Bullet = struct {
             };
         }
 
-        const res: *Bullet = Game.alloc.create(Bullet) catch unreachable;
-        res.* = .{
+        return .{
             .loc = loc,
             .velocity = velocity,
             .rotation = velocity.getAngleDegrees(),
         };
-        return res;
     }
 
-    pub fn deinit(self: *Self) void {
-        Game.alloc.free(self);
-    }
+    pub fn deinit(_: *Self) void {}
 
     pub fn update(self: *Self, dt: f32) void {
-        self.loc.x += self.velocity.x * dt;
-        self.loc.y += self.velocity.y * dt;
+        _ = self;
+        _ = dt;
+        // NOTE: Entities should set velocity, but not move their positions.
+        // self.loc.x += self.velocity.x * dt;
+        // self.loc.y += self.velocity.y * dt;
     }
 
     pub fn render(self: *Self) void {

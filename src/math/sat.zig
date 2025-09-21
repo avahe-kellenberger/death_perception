@@ -185,7 +185,21 @@ pub fn collides(
     }
 
     if (max_enter_time_ratio <= min_exit_time_ratio) {
-        if (contact_normal) |normal| {
+        if (max_enter_time_ratio < 0) {
+            if (mtv_normal) |normal| {
+                // Static collision
+                const contact_loc = getContactLoc(
+                    &axes,
+                    loc_a,
+                    shape_a,
+                    loc_b,
+                    shape_b,
+                    normal,
+                    is_shape_a_contact,
+                );
+                return .init(is_shape_a_mtv, intrusion_mtv, normal, null, contact_loc);
+            }
+        } else if (contact_normal) |normal| {
             // Dynamic collision
             const move_vector_dot = normal.dotProduct(relative_move_vector);
             if (move_vector_dot != 0) {
@@ -208,18 +222,6 @@ pub fn collides(
                     contact_loc,
                 );
             }
-        } else if (mtv_normal) |normal| {
-            // Static collision
-            const contact_loc = getContactLoc(
-                &axes,
-                loc_a,
-                shape_a,
-                loc_b,
-                shape_b,
-                normal,
-                is_shape_a_contact,
-            );
-            return .init(is_shape_a_mtv, intrusion_mtv, normal, null, contact_loc);
         }
     }
 
@@ -357,3 +359,21 @@ const MinMaxProjectionInterval = struct {
         };
     }
 };
+
+test {
+    const alloc = std.testing.allocator;
+    const loc_a: Vector = .init(1.0, 10.0);
+    const loc_b: Vector = .init(10.0, 10.0);
+    const shape_a: CollisionShape = .{ .aabb = .init(Vector.zero, .init(10, 10)) };
+    const shape_b: CollisionShape = shape_a;
+    const move_a: Vector = .init(0, -1);
+    const move_b: Vector = Vector.zero;
+
+    if (collides(alloc, loc_a, shape_a, move_a, loc_b, shape_b, move_b)) |result| {
+        const mtv = result.getMinTranslationVector();
+        try std.testing.expectEqual(1, mtv.x);
+        try std.testing.expectEqual(0, mtv.y);
+    } else {
+        try std.testing.expect(false);
+    }
+}

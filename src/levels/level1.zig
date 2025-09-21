@@ -125,18 +125,20 @@ pub const Level1 = struct {
         while (entity_iter.next()) |kv| switch (kv.value_ptr.*) {
             .player => |*player| {
                 player.update(dt);
-                var iter = Map.CollisionIterator(Player).init(&self.map, player, Player.collision_shape, dt);
+                var iter = Map.CollisionIterator(Player).init(&self.map, player, dt);
+                var mtv: Vector = Vector.zero;
                 while (iter.next()) |result| {
-                    var mtv = result.getMinTranslationVector();
-                    if (result.collision_owner_a) mtv = mtv.negate();
-                    player.loc = player.loc.add(mtv);
-                    break;
+                    var tmp = result.getMinTranslationVector();
+                    if (result.collision_owner_a) tmp = tmp.negate();
+                    mtv = mtv.merge(tmp);
                 }
+
+                player.loc = player.loc.add(player.velocity.scale(dt)).add(mtv);
                 Game.camera.centerOnPoint(player.loc.add(player.sprite_offset));
             },
             .bullet => |*bullet| {
                 bullet.update(dt);
-                var iter = Map.CollisionIterator(Bullet).init(&self.map, bullet, Bullet.collision_shape, dt);
+                var iter = Map.CollisionIterator(Bullet).init(&self.map, bullet, dt);
                 if (iter.next()) |_| {
                     self.entities_to_remove.append(Game.alloc, kv.key_ptr.*) catch unreachable;
                 }
@@ -181,6 +183,7 @@ pub const Level1 = struct {
 
         const player = self.entities.getAs(.player, self.player_id).?;
         if (self.raycast_hit_data) |data| {
+            Game.setRenderColor(.{ .r = 255, .a = 80 });
             Game.fillRect(
                 .{
                     .x = @as(f32, @floatFromInt(data.tile_x)) * Map.tile_size,
@@ -188,15 +191,15 @@ pub const Level1 = struct {
                     .w = Map.tile_size,
                     .h = Map.tile_size,
                 },
-                .{ .r = 255, .a = 80 },
             );
-            Game.fillRect(.{ .x = data.x, .y = data.y, .w = 1, .h = 1 }, Color.green);
+            Game.setRenderColor(Color.green);
+            Game.fillRect(.{ .x = data.x, .y = data.y, .w = 1, .h = 1 });
         }
 
         {
             var iter = self.entities.entities.iterator();
             while (iter.next()) |kv| switch (kv.value_ptr.*) {
-                inline else => |*foo| foo.render(),
+                inline else => |*entity| entity.render(),
             };
         }
 
@@ -206,6 +209,9 @@ pub const Level1 = struct {
         Game.renderer.renderTexture(self.occlusion_texture, null, null) catch unreachable;
 
         self.map.renderWalls();
+
+        Game.setRenderColor(.red);
+        Player.collision_shape.render(player.loc);
     }
 
     fn getHoveredTileBounds() FRect {

@@ -243,37 +243,40 @@ pub const Line = struct {
         });
     }
 
-    // test {
-    //     const line: Line = .init(.init(4, 1), .init(1, 4));
-    //     const ray_origin: Vector = .init(2, 5);
-    //     const ray_dir: Vector = .init(0, 1);
-    //
-    //     const intersection = line.findIntersection(ray_origin, ray_dir);
-    //     try std.testing.expectEqual(null, intersection);
-    // }
-    //
-    // test {
-    //     const line: Line = .init(.init(4, 1), .init(1, 4));
-    //     const ray_origin: Vector = .init(4, 2);
-    //     const ray_dir: Vector = .init(-1, 0);
-    //
-    //     const intersection = line.findIntersection(ray_origin, ray_dir);
-    //     try std.testing.expect(intersection != null);
-    //     try std.testing.expectEqual(3, intersection.?.x);
-    //     try std.testing.expectEqual(2, intersection.?.y);
-    // }
-    //
-    // test {
-    //     const line: Line = .init(.init(4, 1), .init(1, 4));
-    //     const ray_origin: Vector = .init(5, 4);
-    //     var ray_dir: Vector = .init(-10, -10);
-    //     ray_dir = ray_dir.normalize();
-    //
-    //     const intersection = line.findIntersection(ray_origin, ray_dir);
-    //     try std.testing.expect(intersection != null);
-    //     try std.testing.expectEqual(3, intersection.?.x);
-    //     try std.testing.expectEqual(2, intersection.?.y);
-    // }
+    test {
+        const line: Line = .init(.init(4, 1), .init(1, 4));
+        const ray_origin: Vector = .init(2, 5);
+        const ray_dir: Vector = .init(0, 1);
+
+        var intersection: Vector = Vector.zero;
+        const collided: bool = line.findIntersection(ray_origin, ray_dir, &intersection);
+        try std.testing.expectEqual(false, collided);
+    }
+
+    test {
+        const line: Line = .init(.init(4, 1), .init(1, 4));
+        const ray_origin: Vector = .init(4, 2);
+        const ray_dir: Vector = .init(-1, 0);
+
+        var intersection: Vector = Vector.zero;
+        const collided: bool = line.findIntersection(ray_origin, ray_dir, &intersection);
+        try std.testing.expect(collided);
+        try std.testing.expectEqual(3, intersection.x);
+        try std.testing.expectEqual(2, intersection.y);
+    }
+
+    test {
+        const line: Line = .init(.init(4, 1), .init(1, 4));
+        const ray_origin: Vector = .init(5, 4);
+        var ray_dir: Vector = .init(-10, -10);
+        ray_dir = ray_dir.normalize();
+
+        var intersection: Vector = Vector.zero;
+        const collided = line.findIntersection(ray_origin, ray_dir, &intersection);
+        try std.testing.expect(collided);
+        try std.testing.expectEqual(3, intersection.x);
+        try std.testing.expectEqual(2, intersection.y);
+    }
 };
 
 /// Assumes the provided list has enough capacity to add 4 vectors.

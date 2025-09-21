@@ -167,10 +167,11 @@ pub fn Vector(T: type) type {
         }
 
         pub fn merge(self: Self, other: Self) Self {
-            const dot = self.dotProduct(other);
-            const intermediate = other.normalize().scale(@min(dot, other.getMagnitude()));
-            const remainder = other.subtract(intermediate);
-            return self.add(remainder);
+            if (other.x == 0 and other.y == 0) return self;
+            const intermediate = other.normalize().scale(
+                @min(self.dotProduct(other), other.getMagnitude()),
+            );
+            return self.add(other.subtract(intermediate));
         }
     };
 }

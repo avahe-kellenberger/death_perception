@@ -31,6 +31,7 @@ fn run() !void {
 
     const init_flags = sdl.InitFlags{
         .video = true,
+        .audio = true,
         .joystick = true,
         .gamepad = true,
     };
@@ -107,8 +108,12 @@ fn run() !void {
 
         if (Game.state == .quit or Input.isKeyPressed(.escape)) break;
 
-        Game.update(dt);
-        Game.render();
+        {
+            Game.mutex.lock();
+            defer Game.mutex.unlock();
+            Game.update(dt);
+            Game.render();
+        }
 
         try renderer.present();
     }

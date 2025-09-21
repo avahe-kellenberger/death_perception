@@ -23,7 +23,7 @@ pub fn init() void {
     };
     top_left.content = .{
         .text = .{
-            .content = .borrow("Top left"),
+            .string = .borrow("Top left"),
             .align_h = .start,
             .align_v = .start,
             .fit = fit,
@@ -39,7 +39,7 @@ pub fn init() void {
     };
     top_center.content = .{
         .text = .{
-            .content = .borrow("Top center"),
+            .string = .borrow("Top center"),
             .align_h = .center,
             .align_v = .start,
             .fit = fit,
@@ -54,7 +54,7 @@ pub fn init() void {
     };
     top_right.content = .{
         .text = .{
-            .content = .borrow("Top right"),
+            .string = .borrow("Top right"),
             .align_h = .end,
             .align_v = .start,
             .fit = fit,
@@ -70,7 +70,7 @@ pub fn init() void {
     };
     center_left.content = .{
         .text = .{
-            .content = .borrow("Center left"),
+            .string = .borrow("Center left"),
             .align_h = .start,
             .align_v = .center,
             .fit = fit,
@@ -120,7 +120,7 @@ pub fn init() void {
     };
     center_right.content = .{
         .text = .{
-            .content = .borrow("Center right"),
+            .string = .borrow("Center right"),
             .align_h = .end,
             .align_v = .center,
             .fit = fit,
@@ -136,7 +136,7 @@ pub fn init() void {
     };
     bottom_left.content = .{
         .text = .{
-            .content = .borrow("Bottom left"),
+            .string = .borrow("Bottom left"),
             .align_h = .start,
             .align_v = .end,
             .fit = fit,
@@ -152,7 +152,7 @@ pub fn init() void {
     };
     bottom_center.content = .{
         .text = .{
-            .content = .borrow("Bottom center"),
+            .string = .borrow("Bottom center"),
             .align_h = .center,
             .align_v = .end,
             .fit = fit,
@@ -167,7 +167,7 @@ pub fn init() void {
     };
     bottom_right.content = .{
         .text = .{
-            .content = .borrow("Bottom right"),
+            .string = .borrow("Bottom right"),
             .align_h = .end,
             .align_v = .end,
             .fit = fit,

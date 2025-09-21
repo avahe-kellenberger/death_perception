@@ -4,55 +4,11 @@ const Allocator = std.mem.Allocator;
 const sdl = @import("sdl3");
 const ttf = sdl.ttf;
 
+const String = @import("../../../string.zig").String;
 const Color = @import("../../../color.zig").Color;
 const Vector = @import("../../../math/vector.zig").Vector(f32);
 const Game = @import("../../../game.zig");
 const Insets = @import("../../../math/insets.zig").Insets;
-
-const TextContent = union(enum) {
-    const Self = @This();
-
-    borrowed: []const u8,
-    owned: struct {
-        data: []const u8,
-        alloc: Allocator,
-    },
-
-    /// Borrow a string without taking ownership.
-    pub fn borrow(data: []const u8) Self {
-        return .{ .borrowed = data };
-    }
-
-    /// Take ownership of string data.
-    pub fn take(data: []const u8, alloc: Allocator) Self {
-        return .{
-            .owned = .{
-                .data = data,
-                .alloc = alloc,
-            },
-        };
-    }
-
-    /// Use string data to create an owned copy.
-    pub fn clone(data: []const u8, alloc: Allocator) Self {
-        return .take(alloc.dupe(u8, data), alloc);
-    }
-
-    /// Free string data if owned.
-    pub fn deinit(self: *Self) void {
-        if (self.* == .owned) {
-            self.owned.alloc.free(self.owned.data);
-        }
-    }
-
-    /// Access a read-only reference to the string data.
-    pub fn ref(self: *const Self) []const u8 {
-        return switch (self.*) {
-            .borrowed => |d| d,
-            .owned => |o| o.data,
-        };
-    }
-};
 
 const TextAlignment = enum {
     start,
@@ -79,7 +35,7 @@ const Image = struct {
 pub const ComponentText = struct {
     const Self = @This();
 
-    content: TextContent,
+    string: String,
     align_h: TextAlignment = .start,
     align_v: TextAlignment = .start,
     fit: bool = false,
@@ -93,7 +49,17 @@ pub const ComponentText = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        self.content.deinit();
+        self.string.deinit();
+        self.clearImage();
+    }
+
+    pub fn setStr(self: *Self, comptime new_str: []const u8) void {
+        self.setString(.borrow(new_str));
+    }
+
+    pub fn setString(self: *Self, new_string: String) void {
+        self.string.deinit();
+        self.string = new_string;
         self.clearImage();
     }
 
@@ -108,7 +74,7 @@ pub const ComponentText = struct {
     }
 
     fn ensureImage(self: *const Self) ?Image {
-        const text = self.content.ref();
+        const text = self.string.ref();
         if (text.len == 0) {
             @constCast(self).clearImage();
         } else if (self._image == null) {

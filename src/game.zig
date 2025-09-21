@@ -10,9 +10,13 @@ const FRect = sdl.rect.FRect;
 const Camera = @import("camera.zig").Camera;
 const Input = @import("input.zig");
 
+const syncToClients = @import("./net/client.zig").syncToClients;
+
 const ui = @import("./ui/lib/component.zig");
 const TestUI = @import("./ui/test.zig");
 const MainMenu = @import("./ui/main_menu.zig");
+const Lobby = @import("./ui/lobby.zig");
+const JoinGame = @import("./ui/join_game.zig");
 
 const Entity = @import("entity.zig").Entity;
 const Vector = @import("math/vector.zig").Vector(f32);
@@ -24,6 +28,7 @@ const Line = @import("math/collisionshape.zig").Line;
 pub const GameState = enum {
     main_menu,
     lobby,
+    load_game,
     join_game,
     settings,
     in_game,
@@ -38,6 +43,7 @@ pub const GameState = enum {
 pub var observed_fps: f32 = 0;
 
 pub var alloc: Allocator = undefined;
+pub var mutex: std.Thread.Mutex = .{};
 pub var state: GameState = .main_menu;
 pub var renderer: Renderer = undefined;
 pub var camera: Camera = undefined;
@@ -55,6 +61,8 @@ pub fn init(_alloc: Allocator, _renderer: Renderer, _camera: Camera) void {
     camera = _camera;
 
     MainMenu.init();
+    Lobby.init();
+    JoinGame.init();
 
     level = Level1.init();
     // TODO
@@ -69,6 +77,8 @@ pub fn input(event: sdl.events.Event) void {
     switch (state) {
         .test_ui => TestUI.input(event),
         .main_menu => MainMenu.input(event),
+        .lobby => Lobby.input(event),
+        .join_game => JoinGame.input(event),
         else => {
             // Others
         },
@@ -76,11 +86,6 @@ pub fn input(event: sdl.events.Event) void {
 }
 
 pub fn update(frame_delay: f32) void {
-    if (Input.isKeyPressed(.m)) {
-        state = .main_menu;
-    } else if (Input.isKeyPressed(.g)) {
-        state = .in_game;
-    }
     switch (state) {
         .test_ui => {
             TestUI.update(frame_delay);
@@ -89,10 +94,13 @@ pub fn update(frame_delay: f32) void {
             MainMenu.update(frame_delay);
         },
         .lobby => {
+            Lobby.update(frame_delay);
+        },
+        .load_game => {
             // TODO
         },
         .join_game => {
-            // TODO
+            JoinGame.update(frame_delay);
         },
         .settings => {
             // TODO
@@ -111,6 +119,9 @@ pub fn update(frame_delay: f32) void {
         },
         .quit => {},
     }
+
+    // Sync game state to connected clients
+    syncToClients();
 }
 
 pub fn render() void {
@@ -126,10 +137,13 @@ pub fn render() void {
             MainMenu.render(camera.size.x, camera.size.y);
         },
         .lobby => {
+            Lobby.render(camera.size.x, camera.size.y);
+        },
+        .load_game => {
             // TODO
         },
         .join_game => {
-            // TODO
+            JoinGame.render(camera.size.x, camera.size.y);
         },
         .settings => {
             // TODO

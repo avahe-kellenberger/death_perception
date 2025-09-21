@@ -52,10 +52,11 @@ pub fn init() void {
     foreground.setPadding(50);
 
     var title = UIComponent.init();
-    title.setHeight(200);
+    title.setMarginInsets(.{ .top = 50 });
+    title.setHeight(100);
     title.content = .{
         .text = .{
-            .content = .borrow("Death Perception"),
+            .string = .borrow("Death Perception"),
             .align_h = .center,
             .align_v = .center,
             .font = .{
@@ -77,17 +78,40 @@ pub fn init() void {
     menu.setMargin(100);
     menu.setWidth(250);
 
-    var start_button = createMenuButton("Start");
-    start_button.on_mouse_button = .{
+    var new_game_button = createMenuButton("New Game");
+    new_game_button.on_mouse_button = .{
         .context = undefined,
         .handler = struct {
             fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: *anyopaque) void {
                 // TODO should animate going into the door in the background
-                Game.state = .in_game;
+                Game.state = .lobby;
             }
         }.handler,
     };
-    menu.add(start_button);
+    menu.add(new_game_button);
+
+    var load_game_button = createMenuButton("Load Game");
+    load_game_button.on_mouse_button = .{
+        .context = undefined,
+        .handler = struct {
+            fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: *anyopaque) void {
+                // TODO should animate going into the door in the background
+            }
+        }.handler,
+    };
+    menu.add(load_game_button);
+
+    var join_game_button = createMenuButton("Join Game");
+    join_game_button.on_mouse_button = .{
+        .context = undefined,
+        .handler = struct {
+            fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: *anyopaque) void {
+                // TODO should animate going into the door in the background
+                Game.state = .join_game;
+            }
+        }.handler,
+    };
+    menu.add(join_game_button);
 
     var settings_button = createMenuButton("Settings");
     settings_button.on_mouse_button = .{
@@ -157,7 +181,7 @@ fn createMenuButton(comptime text: []const u8) UIComponent {
     button.background_color = button_color;
     button.content = .{
         .text = .{
-            .content = .borrow(text),
+            .string = .borrow(text),
             .align_h = .center,
             .align_v = .center,
             .color = .white,

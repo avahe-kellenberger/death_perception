@@ -121,38 +121,37 @@ pub const Level1 = struct {
     }
 
     pub fn update(self: *Self, dt: f32) void {
-        {
-            var entity_iter = self.entities.entities.iterator();
-            while (entity_iter.next()) |kv| switch (kv.value_ptr.*) {
-                .player => |*player| {
-                    player.update(dt);
-                    var iter = Map.CollisionIterator(Player).init(&self.map, player, Player.collision_shape, dt);
-                    while (iter.next()) |result| {
-                        var mtv = result.getMinTranslationVector();
-                        if (result.collision_owner_a) mtv = mtv.negate();
-                        player.loc = player.loc.add(mtv);
-                        break;
-                    }
-                    Game.camera.centerOnPoint(player.loc.add(player.sprite_offset));
-                },
-                .bullet => |*bullet| {
-                    bullet.update(dt);
-                    var iter = Map.CollisionIterator(Bullet).init(&self.map, bullet, Bullet.collision_shape, dt);
-                    if (iter.next()) |_| {
-                        self.entities_to_remove.append(Game.alloc, kv.key_ptr.*) catch unreachable;
-                    }
-                },
-            };
+        var entity_iter = self.entities.entities.iterator();
+        while (entity_iter.next()) |kv| switch (kv.value_ptr.*) {
+            .player => |*player| {
+                player.update(dt);
+                var iter = Map.CollisionIterator(Player).init(&self.map, player, Player.collision_shape, dt);
+                while (iter.next()) |result| {
+                    var mtv = result.getMinTranslationVector();
+                    if (result.collision_owner_a) mtv = mtv.negate();
+                    player.loc = player.loc.add(mtv);
+                    break;
+                }
+                Game.camera.centerOnPoint(player.loc.add(player.sprite_offset));
+            },
+            .bullet => |*bullet| {
+                bullet.update(dt);
+                var iter = Map.CollisionIterator(Bullet).init(&self.map, bullet, Bullet.collision_shape, dt);
+                if (iter.next()) |_| {
+                    self.entities_to_remove.append(Game.alloc, kv.key_ptr.*) catch unreachable;
+                }
+            },
+        };
 
-            while (self.entities_to_remove.pop()) |id| {
-                self.entities.remove(id);
-            }
+        while (self.entities_to_remove.pop()) |id| {
+            self.entities.remove(id);
         }
 
         if (Input.getButtonState(.left) == .just_pressed) {
             self.raycast_hit_data = null;
 
-            const player_center = Game.camera._loc;
+            const player: *Player = self.entities.getAs(.player, self.player_id) orelse unreachable;
+            const player_center = player.loc.add(player.sprite_offset.scale(0.5));
 
             const clicked_loc = Game.camera.screenToWorld(Input.mouse.loc);
             const raycast_end_loc = player_center.add(

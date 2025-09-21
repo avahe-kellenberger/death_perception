@@ -47,8 +47,11 @@ pub const Bullet = struct {
     pub fn deinit(_: *Self) void {}
 
     pub fn update(self: *Self, dt: f32) void {
-        self.loc.x += self.velocity.x * dt;
-        self.loc.y += self.velocity.y * dt;
+        _ = self;
+        _ = dt;
+        // NOTE: Entities should set velocity, but not move their positions.
+        // self.loc.x += self.velocity.x * dt;
+        // self.loc.y += self.velocity.y * dt;
     }
 
     pub fn render(self: *Self) void {

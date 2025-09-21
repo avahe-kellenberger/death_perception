@@ -132,13 +132,3 @@ pub const EntityList = struct {
         }
     }
 };
-
-test {
-    const p = Player.init();
-    var list = EntityList.init();
-    const id = list.add(Entity{ .player = p });
-    list.remove(id);
-
-    const foo = list.getAs(.player, 1);
-    std.log.err("{s}", .{@typeName(foo)});
-}

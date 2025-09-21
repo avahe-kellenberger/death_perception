@@ -32,7 +32,7 @@ pub const Player = struct {
     image: Texture,
     image_size: Vector,
     anim_player: AnimationPlayer(Self),
-    sprite_offset: Vector = .zero,
+    sprite_offset: Vector,
     /// Range from -1 to 1; 0 means no skewing.
     sprite_skew: f32 = 0,
     sprite_flip: struct {
@@ -56,16 +56,16 @@ pub const Player = struct {
             .{},
         ));
 
-        // idle_anim.addTrack(f32, .init(
-        //     Game.alloc,
-        //     &player.sprite_skew,
-        //     &.{
-        //         .{ .value = 0, .time = 0.0 },
-        //         .{ .value = 0.0112, .time = 0.3 },
-        //         .{ .value = 0, .time = 1.8 },
-        //     },
-        //     .{},
-        // ));
+        idle_anim.addTrack(f32, .init(
+            Game.alloc,
+            &getSkew,
+            &.{
+                .{ .value = 0, .time = 0.0 },
+                .{ .value = 0.0112, .time = 0.3 },
+                .{ .value = 0, .time = 1.8 },
+            },
+            .{},
+        ));
 
         var anim_player: AnimationPlayer(Self) = .init();
         anim_player.addAnimation("idle", idle_anim);
@@ -90,6 +90,10 @@ pub const Player = struct {
         return &self.scale;
     }
 
+    pub fn getSkew(self: *Self) *f32 {
+        return &self.sprite_skew;
+    }
+
     pub fn update(self: *Self, dt: f32) void {
         self.velocity = Vector.zero;
         if (Input.isKeyPressed(.left)) {
@@ -106,8 +110,9 @@ pub const Player = struct {
 
         self.velocity = self.velocity.maxMagnitude(max_speed);
 
-        self.loc.x += self.velocity.x * dt;
-        self.loc.y += self.velocity.y * dt;
+        // NOTE: Entities should set velocity, but not move their positions.
+        // self.loc.x += self.velocity.x * dt;
+        // self.loc.y += self.velocity.y * dt;
 
         self.anim_player.update(self, dt);
     }

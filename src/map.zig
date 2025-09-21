@@ -58,14 +58,6 @@ pub const TileData = struct {
     y: f32,
 };
 
-pub const Body = struct {
-    pub const Self = @This();
-    loc: Vector,
-    velocity: Vector,
-    shape: CollisionShape,
-    pub fn update(_: *Self, _: f32) void {}
-};
-
 pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type {
     return struct {
         pub const Self = @This();
@@ -578,33 +570,29 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             return struct {
                 pub const CollisionIter = @This();
                 map: *Self,
-                body: *T,
+                entity: *T,
                 shape: CollisionShape,
                 dt: f32,
                 is_fast_object: bool,
 
-                pub fn init(map: *Self, body: *T, shape: CollisionShape, dt: f32) CollisionIter {
+                pub fn init(map: *Self, entity: *T, shape: CollisionShape, dt: f32) CollisionIter {
                     return .{
                         .map = map,
-                        .body = body,
+                        .entity = entity,
                         .shape = shape,
                         .dt = dt,
-                        .is_fast_object = body.velocity.getMagnitude() * dt >= tile_size,
+                        .is_fast_object = entity.velocity.getMagnitude() * dt >= tile_size,
                     };
                 }
 
                 pub fn next(iter: *CollisionIter) ?CollisionResult {
-                    const start_loc = iter.body.loc;
-                    iter.body.update(iter.dt);
+                    const delta = iter.entity.velocity.scale(iter.dt);
+                    iter.entity.loc = iter.entity.loc.add(delta);
 
                     const tile_shape: CollisionShape = Self.collision_shape;
 
-                    // TODO: Get different tiles if iter.body.is_fast_object
-                    const movement_area = Self.getPotentialArea(
-                        &iter.shape,
-                        iter.body.loc,
-                        iter.body.loc.subtract(start_loc),
-                    );
+                    // TODO: Get different tiles if iter.entity.is_fast_object
+                    const movement_area = Self.getPotentialArea(&iter.shape, iter.entity.loc, delta);
 
                     var tile_iter = iter.map.tiles.window(movement_area);
                     while (tile_iter.next()) |t| {
@@ -616,9 +604,9 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                         );
                         return sat.collides(
                             Game.alloc,
-                            iter.body.loc,
+                            iter.entity.loc,
                             iter.shape,
-                            iter.body.loc.subtract(start_loc),
+                            delta,
                             tile_loc,
                             tile_shape,
                             Vector.zero,

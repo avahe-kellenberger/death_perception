@@ -370,7 +370,7 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
         }
 
         pub fn renderWalls(self: *Self) void {
-            const window = Self.renderWindow();
+            // const window = Self.renderWindow();
 
             // Render wall tiles
             {
@@ -386,43 +386,44 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                         });
 
                         // if (e.t.kind == .wall or e.t.kind == .corner) {
+                        //     Game.setRenderColor(.green);
                         //     Game.drawRect(.{
                         //         .x = @as(f32, @floatFromInt(e.x)) * tile_size,
                         //         .y = @as(f32, @floatFromInt(e.y)) * tile_size,
                         //         .w = tile_size,
                         //         .h = tile_size,
-                        //     }, Color.green);
+                        //     });
                         // }
                     }
                 }
             }
 
-            var iter = self.tiles.window(window);
-            while (iter.next()) |e| {
-                const bitsum: u8 = @bitCast(e.t.neighbors);
-                var buf: [1 + std.fmt.count("{d}", .{std.math.maxInt(i32)})]u8 = undefined;
-                const str = std.fmt.bufPrintZ(&buf, "{d}", .{bitsum}) catch unreachable;
-
-                Game.renderDebugTextInGame(.{
-                    .x = @as(f32, @floatFromInt(e.x)) * tile_size + tile_size * 0.5 - 12,
-                    .y = @as(f32, @floatFromInt(e.y)) * tile_size + tile_size * 0.5 - 4,
-                }, str);
-            }
-
-            // Game.setRenderColor(Color.red);
-            // for (self.lines.items) |line| {
-            //     Game.drawLine(line);
+            // var iter = self.tiles.window(window);
+            // while (iter.next()) |e| {
+            //     const bitsum: u8 = @bitCast(e.t.neighbors);
+            //     var buf: [1 + std.fmt.count("{d}", .{std.math.maxInt(i32)})]u8 = undefined;
+            //     const str = std.fmt.bufPrintZ(&buf, "{d}", .{bitsum}) catch unreachable;
+            //
+            //     Game.renderDebugTextInGame(.{
+            //         .x = @as(f32, @floatFromInt(e.x)) * tile_size + tile_size * 0.5 - 12,
+            //         .y = @as(f32, @floatFromInt(e.y)) * tile_size + tile_size * 0.5 - 4,
+            //     }, str);
             // }
+
+            Game.setRenderColor(Color.red);
+            for (self.lines.items) |line| {
+                Game.drawLine(line);
+            }
         }
 
         pub fn getPotentialArea(
-            shape: *const CollisionShape,
+            shape: CollisionShape,
             start_loc: Vector,
             movement: Vector,
         ) ArrayWindow {
-            switch (shape.*) {
+            switch (shape) {
                 .aabb => |aabb| {
-                    const size = aabb.bottom_right.subtract(aabb.top_left).scale(0.5);
+                    const size = aabb.bottom_right.subtract(aabb.top_left);
                     const min_x = aabb.top_left.x + @min(start_loc.x, start_loc.x + movement.x) - size.x;
                     const min_y = aabb.bottom_right.y + @min(start_loc.y, start_loc.y + movement.y) - size.y;
                     return ArrayWindow{
@@ -571,46 +572,41 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 pub const CollisionIter = @This();
                 map: *Self,
                 entity: *T,
-                shape: CollisionShape,
-                dt: f32,
                 is_fast_object: bool,
+                tile_iter: Array2D(Tile, width, height).Iterator,
+                move_vector: Vector,
 
-                pub fn init(map: *Self, entity: *T, shape: CollisionShape, dt: f32) CollisionIter {
+                pub fn init(map: *Self, entity: *T, move_vector: Vector) CollisionIter {
+                    // TODO: Get different tiles if iter.entity.is_fast_object
+                    const movement_area = Self.getPotentialArea(T.collision_shape, entity.loc, move_vector);
                     return .{
                         .map = map,
                         .entity = entity,
-                        .shape = shape,
-                        .dt = dt,
-                        .is_fast_object = entity.velocity.getMagnitude() * dt >= tile_size,
+                        .is_fast_object = move_vector.getMagnitude() >= tile_size,
+                        .tile_iter = map.tiles.window(movement_area),
+                        .move_vector = move_vector,
                     };
                 }
 
                 pub fn next(iter: *CollisionIter) ?CollisionResult {
-                    const delta = iter.entity.velocity.scale(iter.dt);
-                    iter.entity.loc = iter.entity.loc.add(delta);
-
-                    const tile_shape: CollisionShape = Self.collision_shape;
-
-                    // TODO: Get different tiles if iter.entity.is_fast_object
-                    const movement_area = Self.getPotentialArea(&iter.shape, iter.entity.loc, delta);
-
-                    var tile_iter = iter.map.tiles.window(movement_area);
-                    while (tile_iter.next()) |t| {
-                        if (t.t.kind != .wall and t.t.kind != .corner) continue;
+                    while (iter.tile_iter.next()) |t| {
+                        if (!t.t.isBoundary()) continue;
 
                         const tile_loc = vector(
                             @as(f32, @floatFromInt(t.x)) * Self.tile_size,
                             @as(f32, @floatFromInt(t.y)) * Self.tile_size,
                         );
-                        return sat.collides(
+                        if (sat.collides(
                             Game.alloc,
                             iter.entity.loc,
-                            iter.shape,
-                            delta,
+                            T.collision_shape,
+                            iter.move_vector,
                             tile_loc,
-                            tile_shape,
+                            Self.collision_shape,
                             Vector.zero,
-                        );
+                        )) |res| {
+                            return res;
+                        }
                     }
                     return null;
                 }
@@ -685,12 +681,13 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                     }
                 }
 
-                Game.drawRect(.{
-                    .x = @as(f32, @floatFromInt(e.x)) * tile_size,
-                    .y = @as(f32, @floatFromInt(e.y)) * tile_size,
-                    .w = tile_size,
-                    .h = tile_size,
-                }, Color.green);
+                // Game.setRenderColor(.green);
+                // Game.drawRect(.{
+                //     .x = @as(f32, @floatFromInt(e.x)) * tile_size,
+                //     .y = @as(f32, @floatFromInt(e.y)) * tile_size,
+                //     .w = tile_size,
+                //     .h = tile_size,
+                // });
             }
             return lines;
         }

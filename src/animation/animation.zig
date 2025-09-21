@@ -21,7 +21,7 @@ pub fn Track(E: type, V: type) type {
 
         alloc: std.mem.Allocator,
         field: *const fn (e: *E) *V,
-        frames: []const Keyframe(V),
+        frames: []Keyframe(V),
         wrap_interpolation: bool,
         ease: *const easings.EasingFn(V) = easings.lerp(V),
 
@@ -147,30 +147,41 @@ pub fn Animation(E: type) type {
 }
 
 test "Animation" {
+    const Foo = struct {
+        pub const Self = @This();
+        a: f32,
+        pub fn getA(foo: *Self) *f32 {
+            return &foo.a;
+        }
+    };
+
     const alloc = std.testing.allocator;
-    var anim: Animation = .init(alloc, 3.0);
+    var anim: Animation(Foo) = .init(alloc, 3.0);
     defer anim.deinit();
 
-    var foo: f32 = 1.0;
-    var frames = [_]Keyframe(f32){
-        .{ .value = foo, .time = 0.0 },
+    const frames = [_]Keyframe(f32){
+        .{ .value = 1.0, .time = 0.0 },
         .{ .value = 2.0, .time = 1.0 },
         .{ .value = 3.0, .time = 2.0 },
         .{ .value = 4.0, .time = 3.0 },
     };
 
-    var track: Track(f32) = .init(alloc, &foo, &frames, .{});
-    defer track.deinit();
+    var foo: Foo = .{ .a = 0.0 };
+
+    const track: Track(Foo, f32) = .init(alloc, &Foo.getA, &frames, .{});
     anim.addTrack(f32, track);
 
-    try std.testing.expectEqual(1.0, foo);
+    try std.testing.expectEqual(0.0, foo.a);
 
-    anim.update(1.0);
-    try std.testing.expectEqual(2.0, foo);
+    anim.update(&foo, 0.0);
+    try std.testing.expectEqual(1.0, foo.a);
 
-    anim.update(2.0);
-    try std.testing.expectEqual(3.0, foo);
+    anim.update(&foo, 1.0);
+    try std.testing.expectEqual(2.0, foo.a);
 
-    anim.update(3.0);
-    try std.testing.expectEqual(4.0, foo);
+    anim.update(&foo, 2.0);
+    try std.testing.expectEqual(3.0, foo.a);
+
+    anim.update(&foo, 3.0);
+    try std.testing.expectEqual(4.0, foo.a);
 }

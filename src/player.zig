@@ -110,10 +110,6 @@ pub const Player = struct {
 
         self.velocity = self.velocity.maxMagnitude(max_speed);
 
-        // NOTE: Entities should set velocity, but not move their positions.
-        // self.loc.x += self.velocity.x * dt;
-        // self.loc.y += self.velocity.y * dt;
-
         self.anim_player.update(self, dt);
     }
 

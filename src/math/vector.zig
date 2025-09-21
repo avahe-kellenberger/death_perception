@@ -165,6 +165,12 @@ pub fn Vector(T: type) type {
         pub fn equals(self: Self, other: Self) bool {
             return self.x == other.x and self.y == other.y;
         }
+
+        pub fn merge(self: Self, other: Self) Self {
+            if (other.x == 0 and other.y == 0) return self;
+            const intermediate = other.maxMagnitude(self.dotProduct(other));
+            return self.add(other.subtract(intermediate));
+        }
     };
 }
 

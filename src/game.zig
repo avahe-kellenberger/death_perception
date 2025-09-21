@@ -299,22 +299,20 @@ pub fn renderTextureByCorners(
     renderer.renderGeometry(t, verts, &.{ 3, 1, 0, 2, 1, 3 }) catch unreachable;
 }
 
-pub fn fillRect(dest: FRect, color: Color) void {
+pub fn fillRect(dest: FRect) void {
     if (camera.intersects(dest)) if (camera.getScale()) |_| {
         var r = dest;
         r.x -= camera.viewport.x;
         r.y -= camera.viewport.y;
-        renderer.setDrawColor(color.sdl()) catch unreachable;
         renderer.renderFillRect(r) catch unreachable;
     };
 }
 
-pub fn drawRect(dest: FRect, color: Color) void {
+pub fn drawRect(dest: FRect) void {
     if (camera.intersects(dest)) if (camera.getScale()) |_| {
         var r = dest;
         r.x -= camera.viewport.x;
         r.y -= camera.viewport.y;
-        renderer.setDrawColor(color.sdl()) catch unreachable;
         renderer.renderRect(r) catch unreachable;
     };
 }

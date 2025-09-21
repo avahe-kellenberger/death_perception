@@ -168,9 +168,7 @@ pub fn Vector(T: type) type {
 
         pub fn merge(self: Self, other: Self) Self {
             if (other.x == 0 and other.y == 0) return self;
-            const intermediate = other.normalize().scale(
-                @min(self.dotProduct(other), other.getMagnitude()),
-            );
+            const intermediate = other.maxMagnitude(self.dotProduct(other));
             return self.add(other.subtract(intermediate));
         }
     };

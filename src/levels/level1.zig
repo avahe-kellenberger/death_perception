@@ -125,7 +125,7 @@ pub const Level1 = struct {
         while (entity_iter.next()) |kv| switch (kv.value_ptr.*) {
             .player => |*player| {
                 player.update(dt);
-                var iter = Map.CollisionIterator(Player).init(&self.map, player, dt);
+                var iter = Map.CollisionIterator(Player).init(&self.map, player, player.velocity.scale(dt));
                 var mtv: Vector = Vector.zero;
                 while (iter.next()) |result| {
                     var tmp = result.getMinTranslationVector();
@@ -138,7 +138,7 @@ pub const Level1 = struct {
             },
             .bullet => |*bullet| {
                 bullet.update(dt);
-                var iter = Map.CollisionIterator(Bullet).init(&self.map, bullet, dt);
+                var iter = Map.CollisionIterator(Bullet).init(&self.map, bullet, bullet.velocity.scale(dt));
                 if (iter.next()) |_| {
                     self.entities_to_remove.append(Game.alloc, kv.key_ptr.*) catch unreachable;
                 }

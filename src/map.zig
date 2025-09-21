@@ -572,20 +572,17 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 pub const CollisionIter = @This();
                 map: *Self,
                 entity: *T,
-                dt: f32,
                 is_fast_object: bool,
                 tile_iter: Array2D(Tile, width, height).Iterator,
                 move_vector: Vector,
 
-                pub fn init(map: *Self, entity: *T, dt: f32) CollisionIter {
-                    const move_vector = entity.velocity.scale(dt);
+                pub fn init(map: *Self, entity: *T, move_vector: Vector) CollisionIter {
                     // TODO: Get different tiles if iter.entity.is_fast_object
                     const movement_area = Self.getPotentialArea(T.collision_shape, entity.loc, move_vector);
                     return .{
                         .map = map,
                         .entity = entity,
-                        .dt = dt,
-                        .is_fast_object = entity.velocity.getMagnitude() * dt >= tile_size,
+                        .is_fast_object = move_vector.getMagnitude() >= tile_size,
                         .tile_iter = map.tiles.window(movement_area),
                         .move_vector = move_vector,
                     };

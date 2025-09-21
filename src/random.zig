@@ -9,8 +9,10 @@ pub fn init() void {
         std.posix.getrandom(std.mem.asBytes(&s)) catch unreachable;
         break :blk s;
     };
+    // const seed = 17834943786358254303;
     prng = .init(seed);
     random = prng.random();
+    std.log.err("Seed: {}", .{seed});
 }
 
 pub fn rand(T: type, at_least: T, at_most: T) T {

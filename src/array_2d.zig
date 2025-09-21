@@ -64,7 +64,11 @@ pub fn Array2D(T: type, comptime width: usize, comptime height: usize) type {
         }
 
         const Iterator = struct {
-            const Result = struct { t: *T, x: usize, y: usize };
+            const Result = struct {
+                t: *T,
+                x: usize,
+                y: usize,
+            };
 
             arr: *Array2D(T, width, height),
 

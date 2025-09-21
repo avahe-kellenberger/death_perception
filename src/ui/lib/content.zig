@@ -1,4 +1,4 @@
-const Insets = @import("./types.zig").Insets;
+const Insets = @import("../../math/insets.zig").Insets;
 
 const ComponentText = @import("./content/text.zig").ComponentText;
 const ComponentImage = @import("./content/image.zig").ComponentImage;

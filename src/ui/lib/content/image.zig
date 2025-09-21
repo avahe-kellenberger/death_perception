@@ -2,7 +2,7 @@ const sdl = @import("sdl3");
 
 const Vector = @import("../../../math/vector.zig").Vector(f32);
 const Game = @import("../../../game.zig");
-const Insets = @import("../types.zig").Insets;
+const Insets = @import("../../../math/insets.zig").Insets;
 
 /// For details, see: https://developer.mozilla.org/en-US/docs/Web/CSS/object-fit
 const ImageFit = enum {

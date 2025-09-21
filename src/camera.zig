@@ -30,7 +30,20 @@ pub const Camera = struct {
         return cam;
     }
 
-    pub fn getScale(self: *Self) ?f32 {
+    pub fn viewportLoc(self: *const Self) Vector {
+        return .{ .x = self.viewport.x, .y = self.viewport.y };
+    }
+
+    pub fn verticies(self: *const Self) [4]Vector {
+        return .{
+            self.viewportLoc(), // top-left
+            .init(self.viewport.x + self.viewport.w, self.viewport.y), // top-right
+            .init(self.viewport.x + self.viewport.w, self.viewport.y + self.viewport.h), // bottom-right
+            .init(self.viewport.x, self.viewport.y + self.viewport.h), // bottom-left
+        };
+    }
+
+    pub fn getScale(self: *const Self) ?f32 {
         const relative_z = DEFAULT_Z - self._z;
         if (relative_z <= 0) return null;
         return 1.0 / relative_z;

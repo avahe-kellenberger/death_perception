@@ -280,7 +280,7 @@ fn _getContactLoc(
     }
 
     // Get the vector perpendicular to the contact normal.
-    const edge = owner_contact_normal.perp();
+    const edge = owner_contact_normal.perpLeft();
 
     // Get the projections of the points of the other shape onto the edge.
     const min_max_proj_other = MinMaxProjectionInterval.init(buffer.items, edge);

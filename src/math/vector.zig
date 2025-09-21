@@ -5,7 +5,7 @@ const expectEqual = std.testing.expectEqual;
 const expectApproxEqAbs = std.testing.expectApproxEqAbs;
 
 pub fn Vector(T: type) type {
-    return struct {
+    return packed struct {
         pub const Self = @This();
         pub const zero = switch (@typeInfo(T)) {
             .float => vector(0, 0),
@@ -88,16 +88,82 @@ pub fn Vector(T: type) type {
             }
         }
 
+        pub fn crossProduct(self: Self, other: Self) f32 {
+            const result = self.x * other.y - self.y * other.x;
+            switch (@typeInfo(T)) {
+                .float => return result,
+                .int => return @floatFromInt(result),
+                else => unreachable,
+            }
+        }
+
         pub fn negate(self: Self) Self {
             return .{ .x = -self.x, .y = -self.y };
         }
 
-        pub fn perp(self: Self) Self {
+        pub fn perpRight(self: Self) Self {
+            return .init(self.y, -self.x);
+        }
+
+        pub fn perpLeft(self: Self) Self {
             return .init(-self.y, self.x);
         }
 
         pub fn round(self: Self) Self {
             return .init(@round(self.x), @round(self.y));
+        }
+
+        /// Gets a copy of this vector rotated around its origin by the given amount.
+        /// @param theta the number of radians to rotate the vector.
+        pub fn rotate(self: Self, theta: f32) Self {
+            const x = self.x * @cos(theta) - self.y * @sin(theta);
+            const y = self.x * @sin(theta) + self.y * @cos(theta);
+            switch (@typeInfo(T)) {
+                .float => return .{ .x = x, .y = y },
+                .int => return .{
+                    .x = @as(T, @intFromFloat(@round(x))),
+                    .y = @as(T, @intFromFloat(@round(y))),
+                },
+                else => unreachable,
+            }
+        }
+
+        /// Rotates counter-clockwise around the given anchor point.
+        /// @param theta The radians to rotate.
+        /// @param anchorPoint The anchor point to rotate around.
+        /// @return A rotated point around the anchor point.
+        pub fn rotateAround(self: Self, theta: f32, anchor: Self) Self {
+            const x = anchor.x + (@cos(theta) * (self.x - anchor.x) - @sin(theta) * (self.y - anchor.y));
+            const y = anchor.y + (@sin(theta) * (self.x - anchor.x) + @cos(theta) * (self.y - anchor.y));
+            switch (@typeInfo(T)) {
+                .float => return .{ .x = x, .y = y },
+                .int => return .{
+                    .x = @as(T, @intFromFloat(@round(x))),
+                    .y = @as(T, @intFromFloat(@round(y))),
+                },
+                else => unreachable,
+            }
+        }
+
+        /// Gets the angle of this vector, in radians.
+        /// (from -pi to pi)
+        pub fn getAngleRadians(self: Self) f32 {
+            return std.math.atan2(self.y, self.x);
+        }
+
+        pub fn getAngleDegrees(self: Self) f32 {
+            return std.math.radiansToDegrees(self.getAngleRadians());
+        }
+
+        pub fn getSignedAngleDifference(angle1: f32, angle2: f32) f32 {
+            var diff = angle2 - angle1;
+            if (diff <= -std.math.pi) diff += std.math.tau;
+            if (diff > std.math.pi) diff -= std.math.tau;
+            return diff;
+        }
+
+        pub fn equals(self: Self, other: Self) bool {
+            return self.x == other.x and self.y == other.y;
         }
     };
 }

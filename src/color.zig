@@ -1,5 +1,12 @@
 const sdl_ = @import("sdl3");
 
+const WithColor = struct {
+    r: ?u8 = null,
+    g: ?u8 = null,
+    b: ?u8 = null,
+    a: ?u8 = null,
+};
+
 pub const Color = struct {
     const Self = @This();
 
@@ -14,6 +21,15 @@ pub const Color = struct {
     pub const red: Color = .{ .r = 255 };
     pub const green: Color = .{ .g = 255 };
     pub const blue: Color = .{ .b = 255 };
+
+    pub fn with(self: *const Self, w: WithColor) Self {
+        var c = self.*;
+        if (w.r) |r| c.r = r;
+        if (w.g) |g| c.g = g;
+        if (w.b) |b| c.b = b;
+        if (w.a) |a| c.a = a;
+        return c;
+    }
 
     pub fn sdl(self: *const Self) sdl_.pixels.Color {
         return .{ .r = self.r, .g = self.g, .b = self.b, .a = self.a };

@@ -1,4 +1,5 @@
 const sdl = @import("sdl3");
+const builtin = @import("builtin");
 const std = @import("std");
 
 const Game = @import("game.zig");
@@ -12,6 +13,18 @@ const screen_width = 1600;
 const screen_height = 900;
 
 pub fn main() !void {
+    if (builtin.mode == .Debug) {
+        var debug_alloc = std.heap.DebugAllocator(.{ .stack_trace_frames = 100 }){};
+        defer _ = debug_alloc.deinit();
+        Game.alloc = debug_alloc.allocator();
+        try run();
+    } else {
+        Game.alloc = std.heap.smp_allocator;
+        try run();
+    }
+}
+
+fn run() !void {
     defer sdl.shutdown();
 
     // Initialize SDL with subsystems you need here.
@@ -33,9 +46,7 @@ pub fn main() !void {
 
     // End of SDL init
 
-    const alloc = std.heap.smp_allocator;
-
-    Input.init(alloc);
+    Input.init(Game.alloc);
     defer Input.deinit();
 
     random_mod.init();
@@ -50,8 +61,8 @@ pub fn main() !void {
     const window = initResult.window;
 
     var display = try sdl.video.Display.getPrimaryDisplay();
-    const modes = try display.getFullscreenModes(alloc);
-    defer alloc.free(modes);
+    const modes = try display.getFullscreenModes(Game.alloc);
+    defer Game.alloc.free(modes);
 
     const refresh_rate: usize = if (modes[0].refresh_rate) |rr| @intFromFloat(rr) else 60;
 
@@ -62,7 +73,7 @@ pub fn main() !void {
     const window_size = try window.getSizeInPixels();
 
     Game.init(
-        alloc,
+        Game.alloc,
         renderer,
         Camera.init(.{ .x = 0, .y = 0 }, .{
             .x = @floatFromInt(window_size.width),
@@ -74,8 +85,7 @@ pub fn main() !void {
     while (Game.state != .quit) {
         // Delay to limit the FPS
         const dt = fps_capper.delay();
-        // std.log.err("{}", .{dt});
-        // std.log.err("Real FPS: {}", .{fps_capper.getObservedFps()});
+        Game.observed_fps = fps_capper.getObservedFps();
 
         Input.resetFrameSpecificState();
         while (sdl.events.poll()) |event| {
@@ -112,4 +122,7 @@ pub fn main() !void {
 test {
     // Required for `zig build test` to find all tests in src
     std.testing.refAllDecls(@This());
+    // TODO: Why do I have to do this
+    _ = @import("math/easings.zig");
+    _ = @import("animation//animation.zig");
 }

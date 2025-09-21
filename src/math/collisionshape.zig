@@ -18,6 +18,7 @@ pub const CollisionShape = union(enum) {
 
     aabb: AABB,
     circle: Circle,
+    line: Line,
 
     pub fn getProjectionAxesCount(self: Self, other: Self) u32 {
         switch (self) {
@@ -25,7 +26,9 @@ pub const CollisionShape = union(enum) {
             .circle => switch (other) {
                 .aabb => return 4,
                 .circle => return 1,
+                .line => return 2,
             },
+            .line => return 1,
         }
     }
 
@@ -41,17 +44,21 @@ pub const CollisionShape = union(enum) {
         to_other: Vector,
     ) void {
         switch (self) {
-            .aabb => {
-                for (aabb_projection_axes) |axis| verticies.appendAssumeCapacity(axis);
-            },
+            .aabb => for (aabb_projection_axes) |axis| verticies.appendAssumeCapacity(axis),
             .circle => |circle| switch (other) {
                 .aabb => |aabb| {
                     circleToAABBProjectionAxes(verticies, circle, aabb, to_other);
                 },
                 .circle => |other_circle| {
-                    verticies.appendAssumeCapacity(other_circle.center.subtract(circle.center).add(to_other).normalize());
+                    verticies.appendAssumeCapacity(
+                        other_circle.center.subtract(circle.center).add(to_other).normalize(),
+                    );
+                },
+                .line => |line| {
+                    circleToLineProjectionAxes(verticies, circle, line, to_other);
                 },
             },
+            .line => |line| verticies.appendAssumeCapacity(line.end.subtract(line.start).perpRight()),
         }
     }
 
@@ -59,7 +66,7 @@ pub const CollisionShape = union(enum) {
         switch (self) {
             .aabb => |aabb| {
                 var projection = Vector.init(std.math.inf(f32), -std.math.inf(f32));
-                for (aabb.verticies()) |v| {
+                inline for (aabb.verticies()) |v| {
                     const dot_product = axis.dotProduct(v.add(loc));
                     if (dot_product < projection.x) projection.x = dot_product;
                     if (dot_product > projection.y) projection.y = dot_product;
@@ -69,6 +76,14 @@ pub const CollisionShape = union(enum) {
             .circle => |circle| {
                 const center_dot = axis.dotProduct(circle.center.add(loc));
                 return .init(center_dot - circle.radius, center_dot + circle.radius);
+            },
+            .line => |line| {
+                const dot_product_start = axis.dotProduct(line.start.add(loc));
+                const dot_product_end = axis.dotProduct(line.end.add(loc));
+                return .{
+                    .x = @min(dot_product_start, dot_product_end),
+                    .y = @max(dot_product_start, dot_product_end),
+                };
             },
         }
     }
@@ -116,6 +131,13 @@ pub const CollisionShape = union(enum) {
             .circle => |circle| {
                 out.appendAssumeCapacity(circle.center.add(direction.scale(circle.radius)));
             },
+            .line => |line| {
+                if (line.start.dotProduct(direction) > line.end.dotProduct(direction)) {
+                    out.appendAssumeCapacity(line.start);
+                } else {
+                    out.appendAssumeCapacity(line.end);
+                }
+            },
         }
         return out.items;
     }
@@ -157,6 +179,76 @@ pub const Circle = struct {
     }
 };
 
+pub const Line = struct {
+    pub const Self = @This();
+
+    // Normal should always face right
+    start: Vector,
+    end: Vector,
+
+    pub fn init(start: Vector, end: Vector) Line {
+        return .{ .start = start, .end = end };
+    }
+
+    pub fn middle(self: Line) Vector {
+        return self.start.add(self.end).scale(0.5);
+    }
+
+    pub fn findIntersection(self: *const Self, ray_origin: Vector, direction: Vector, out: *Vector) bool {
+        const v2 = self.end.subtract(self.start);
+        const v3 = direction.perpLeft();
+
+        const dot = v2.dotProduct(v3);
+        if (dot == 0) {
+            out.* = ray_origin;
+            return false;
+        }
+
+        const v1 = ray_origin.subtract(self.start);
+        // Distance from ray_origin in direction where the intersection occurred
+        const t1 = v2.crossProduct(v1) / dot;
+        // 0.0 to 1.0 along the line from self.start to the intersection
+        const t2 = v1.dotProduct(v3) / dot;
+
+        // We could also return this
+        // return self.start.add(v2.scale(t2));
+        out.* = ray_origin.add(direction.scale(t1));
+        return t1 >= 0.0 and (t2 >= 0.0 and t2 <= 1.0);
+    }
+
+    test {
+        const line: Line = .init(.init(4, 1), .init(1, 4));
+        const ray_origin: Vector = .init(2, 5);
+        const ray_dir: Vector = .init(0, 1);
+
+        const intersection = line.findIntersection(ray_origin, ray_dir);
+        try std.testing.expectEqual(null, intersection);
+    }
+
+    test {
+        const line: Line = .init(.init(4, 1), .init(1, 4));
+        const ray_origin: Vector = .init(4, 2);
+        const ray_dir: Vector = .init(-1, 0);
+
+        const intersection = line.findIntersection(ray_origin, ray_dir);
+        try std.testing.expect(intersection != null);
+        try std.testing.expectEqual(3, intersection.?.x);
+        try std.testing.expectEqual(2, intersection.?.y);
+    }
+
+    test {
+        const line: Line = .init(.init(4, 1), .init(1, 4));
+        const ray_origin: Vector = .init(5, 4);
+        var ray_dir: Vector = .init(-10, -10);
+        ray_dir = ray_dir.normalize();
+
+        const intersection = line.findIntersection(ray_origin, ray_dir);
+        try std.testing.expect(intersection != null);
+        try std.testing.expectEqual(3, intersection.?.x);
+        try std.testing.expectEqual(2, intersection.?.y);
+    }
+};
+
 /// Assumes the provided list has enough capacity to add 4 vectors.
 fn circleToAABBProjectionAxes(
     list: *ArrayList(Vector),
@@ -167,4 +259,14 @@ fn circleToAABBProjectionAxes(
     for (aabb.verticies()) |v| {
         list.appendAssumeCapacity(v.subtract(circle.center).add(circle_to_aabb).normalize());
     }
+}
+/// Assumes the provided list has enough capacity to add 2 vectors.
+fn circleToLineProjectionAxes(
+    list: *ArrayList(Vector),
+    circle: Circle,
+    line: Line,
+    circle_to_line: Vector,
+) void {
+    list.appendAssumeCapacity(line.start.subtract(circle.center).add(circle_to_line).normalize());
+    list.appendAssumeCapacity(line.end.subtract(circle.center).add(circle_to_line).normalize());
 }

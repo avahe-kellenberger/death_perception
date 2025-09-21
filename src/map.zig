@@ -17,32 +17,61 @@ const Vector = vector_mod.Vector(f32);
 const vector = vector_mod.vector;
 
 const CollisionShape = @import("math/collisionshape.zig").CollisionShape;
+const Line = @import("math/collisionshape.zig").Line;
+
+const sat = @import("math/sat.zig");
+const CollisionResult = sat.CollisionResult;
+const Insets = @import("math/insets.zig").Insets;
 
 const Color = @import("color.zig").Color;
+
+pub const TileKind = enum { floor, wall, corner, inner };
 
 pub const Tile = struct {
     floor_image_index: i32 = -1,
     wall_image_index: i32 = -1,
-    neighbor_bit_sum: u8 = 0,
-    is_wall: bool = false,
+    neighbors: NeighborTiles = .{},
+    kind: TileKind = .floor,
+    insets: Insets = .zero,
+
+    pub fn isBoundary(t: Tile) bool {
+        return t.kind == .wall or t.kind == .corner;
+    }
+};
+
+const NeighborTiles = packed struct(u8) {
+    top_left: bool = false,
+    top: bool = false,
+    top_right: bool = false,
+    left: bool = false,
+    right: bool = false,
+    bottom_left: bool = false,
+    bottom: bool = false,
+    bottom_right: bool = false,
 };
 
 pub const TileData = struct {
     tile: *Tile,
-    x: usize,
-    y: usize,
+    tile_x: usize,
+    tile_y: usize,
+    x: f32,
+    y: f32,
 };
 
 pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type {
     return struct {
         pub const Self = @This();
         pub const tile_size: f32 = _tile_size;
+        pub const tile_diagonal_len: f32 = _tile_size * std.math.sqrt(2.0);
+        pub const collision_shape: CollisionShape = .{
+            .aabb = .init(vector(0, 0), vector(_tile_size, _tile_size)),
+        };
 
         floor_tiles_sheet: Spritesheet,
         wall_tiles_sheet: Spritesheet,
         tiles: *Array2D(Tile, width, height),
 
-        collision_shape: CollisionShape,
+        lines: std.ArrayList(Line) = .empty,
 
         pub fn init(
             floor_tiles_sheet: Spritesheet,
@@ -57,35 +86,40 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 .floor_tiles_sheet = floor_tiles_sheet,
                 .wall_tiles_sheet = wall_tiles_sheet,
                 .tiles = tiles,
-                .collision_shape = .{ .aabb = .init(vector(0, 0), vector(_tile_size, _tile_size)) },
             };
 
             var iter = result.tiles.iterator();
             while (iter.next()) |e| {
                 // Initialize all tiles
-                e.t.* = .{
-                    .is_wall = (e.x < border_thickness or
-                        e.x >= (width - border_thickness) or
-                        e.y < border_thickness or
-                        e.y >= (height - border_thickness) or
-                        (density > 0 and density >= rand(f32, 0, 100))),
-                };
+                e.t.* = .{};
+                if (e.x < border_thickness + 1 or
+                    e.x >= (width - border_thickness - 1) or
+                    e.y < border_thickness + 1 or
+                    e.y >= (height - border_thickness - 1) or
+                    (density > 0 and density >= rand(f32, 0, 100)))
+                {
+                    e.t.kind = .wall;
+                }
             }
 
             // Create basic map layout
-            processCellularAutoma(&result);
+            processCellularAutomata(&result);
             // Eliminate any smaller secluded rooms that were generated
             fillSmallerRooms(&result) catch unreachable;
             // Select correct images after map has been generated
-            setupTileImages(&result);
+            determineUniqueTileData(&result);
+
+            result.lines = result.determineLines();
+
             return result;
         }
 
         pub fn deinit(self: *Self) void {
+            self.lines.deinit(Game.alloc);
             Game.alloc.destroy(self.tiles);
         }
 
-        fn processCellularAutoma(self: *Self) void {
+        fn processCellularAutomata(self: *Self) void {
             const max_iterations = 100;
             var failed = true;
 
@@ -93,21 +127,16 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 var has_changed = false;
                 var iter = self.tiles.iterator();
                 while (iter.next()) |e| {
-                    var num_neighboring_walls: usize = 0;
-                    for (self.getMooreNeighborhood(e.x, e.y)) |is_wall| {
-                        if (is_wall) num_neighboring_walls += 1;
-                    }
+                    const bitsum: u8 = @bitCast(self.getMooreNeighborhood(e.x, e.y));
+                    var num_neighboring_walls: u16 = @popCount(bitsum);
 
-                    if (self.tiles.get(e.x, e.y).is_wall) {
-                        num_neighboring_walls += 1;
-                    }
+                    const was_wall = e.t.kind == .wall;
+                    if (was_wall) num_neighboring_walls += 1;
 
-                    const was_wall = self.tiles.get(e.x, e.y).is_wall;
                     const is_wall = num_neighboring_walls > 4;
-
                     if (was_wall != is_wall) {
                         has_changed = true;
-                        e.t.is_wall = is_wall;
+                        e.t.kind = if (is_wall) .wall else .floor;
                         e.t.floor_image_index = -1;
                         e.t.wall_image_index = -1;
                     }
@@ -141,7 +170,7 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
 
             var iter = self.tiles.iterator();
             while (iter.next()) |e| {
-                if (e.t.is_wall) continue;
+                if (e.t.kind == .wall) continue;
 
                 // Found a floor tile, skip if we've seen it before
                 if (visited.get(e.x, e.y).*) continue;
@@ -157,7 +186,7 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
 
                 try queue.append(Game.alloc, .{ .x = e.x, .y = e.y });
                 while (queue.pop()) |n| {
-                    if (self.tiles.get(n.x, n.y).is_wall or visited.get(n.x, n.y).*) continue;
+                    if (self.tiles.get(n.x, n.y).kind == .wall or visited.get(n.x, n.y).*) continue;
                     // Add tile to the current room
                     try room.append(Game.alloc, n);
                     visited.set(n.x, n.y, true);
@@ -194,7 +223,7 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 if (i == 0) continue;
                 for (room) |coord| {
                     var tile = self.tiles.get(coord.x, coord.y);
-                    tile.is_wall = true;
+                    tile.kind = .wall;
                 }
             }
         }
@@ -203,100 +232,129 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             return a.len > b.len;
         }
 
-        fn setupTileImages(self: *Self) void {
+        fn determineUniqueTileData(self: *Self) void {
+            {
+                var iter = self.tiles.iterator();
+                while (iter.next()) |e| e.t.neighbors = self.getMooreNeighborhood(e.x, e.y);
+            }
+
             var iter = self.tiles.iterator();
             while (iter.next()) |e| {
-                e.t.neighbor_bit_sum = self.calcNeighborBitsum(e.t.is_wall, e.x, e.y);
-                if (e.t.is_wall) {
-                    e.t.wall_image_index = switch (e.t.neighbor_bit_sum) {
-                        255 => 0,
-                        107, 111, 235 => 1,
-                        182, 183, 214, 215, 246 => 2,
-                        180, 212, 240, 244 => 3,
-                        248, 249, 252 => 4,
-                        105, 216, 217, 232, 233 => 5,
-                        22, 23, 54, 55, 150, 151 => 6,
-                        31, 63, 159 => 7,
-                        11, 15, 43, 47, 91, 95 => 8,
-                        127 => 9,
-                        191, 223 => 10,
-                        251 => 11,
-                        254 => 12,
-                        219 => 14,
-                        else => 0,
-                    };
-
-                    e.t.floor_image_index = switch (e.t.neighbor_bit_sum) {
-                        212, 232, 240, 244, 248, 249, 252 => 0,
-                        105, 233 => 3,
+                const bitsum: u8 = @bitCast(e.t.neighbors);
+                if (e.t.kind == .wall) {
+                    e.t.floor_image_index = switch (bitsum) {
+                        // 212, 232, 240, 244, 248, 249, 252 => 0,
+                        // 105, 233 => 3,
                         else => -1,
                     };
+
+                    switch (bitsum) {
+                        255 => {
+                            e.t.wall_image_index = 0;
+                            e.t.kind = .inner;
+                        },
+                        107, 111, 235 => e.t.wall_image_index = 1,
+                        182, 183, 214, 215, 246 => e.t.wall_image_index = 2,
+                        180, 212, 240, 244 => {
+                            e.t.wall_image_index = 3;
+                            e.t.kind = .corner;
+                        },
+                        211 => {
+                            e.t.wall_image_index = 3;
+                            e.t.kind = .wall;
+                        },
+                        191, 248, 249, 252 => e.t.wall_image_index = 4,
+                        105, 216, 217, 232, 233 => {
+                            e.t.wall_image_index = 5;
+                            e.t.kind = .corner;
+                        },
+                        22, 23, 54, 55, 150, 151 => {
+                            e.t.wall_image_index = 6;
+                            e.t.kind = .corner;
+                        },
+                        31, 63, 159 => e.t.wall_image_index = 7,
+                        11, 15, 43, 47, 91, 95, 139 => {
+                            e.t.wall_image_index = 8;
+                            e.t.kind = .corner;
+                        },
+                        203 => {
+                            e.t.wall_image_index = 8;
+                            e.t.kind = .wall;
+                        },
+                        127 => {
+                            e.t.wall_image_index = 9;
+                            e.t.kind = .inner;
+                        },
+                        223 => {
+                            e.t.wall_image_index = 10;
+                            e.t.kind = .inner;
+                        },
+                        251 => {
+                            e.t.wall_image_index = 11;
+                            e.t.kind = .inner;
+                        },
+                        254 => {
+                            e.t.wall_image_index = 12;
+                            e.t.kind = .inner;
+                        },
+                        219 => {
+                            e.t.wall_image_index = 14;
+                            e.t.kind = .inner;
+                        },
+                        else => {
+                            e.t.wall_image_index = 0;
+                            e.t.kind = .inner;
+                        },
+                    }
+
+                    // Determine tile insets for more accurate collision and visibility
+                    e.t.insets = switch (e.t.wall_image_index) {
+                        1, 2 => .{ .top = -Game.scale, .bottom = -Game.scale }, // right wall
+                        3 => .{ .left = Game.scale, .top = Game.scale, .right = -Game.scale, .bottom = -Game.scale },
+                        4 => .{ .left = -Game.scale, .top = Game.scale, .right = -Game.scale },
+                        5 => .{ .right = Game.scale, .top = Game.scale, .left = -Game.scale, .bottom = -Game.scale },
+                        else => .zero,
+                    };
                 } else {
-                    e.t.floor_image_index = switch (e.t.neighbor_bit_sum) {
-                        100, 104, 105, 232, 233, 248, 249, 252 => 2,
-                        22, 150, 214, 246 => 3,
-                        254 => 4,
-                        208, 212, 240, 244 => 5,
+                    e.t.floor_image_index = switch (bitsum) {
+                        3, 6, 7, 22, 23, 150 => 2,
+                        9, 41, 105 => 3,
+                        1 => 4,
+                        11, 15, 43 => 5,
                         // This is usually image index 0, but we don't need to draw the empty tile.
                         else => -1,
                     };
+                    e.t.kind = .floor;
                 }
             }
         }
 
-        /// Calculates a bit sum based on all neighboring tiles:
-        ///
-        /// 0 1 0
-        /// 0 X 1
-        /// 1 0 0
-        ///
-        /// Where X is the local tile, and each 0 or 1 representing a neighboring tile.
-        /// 8 neighboring tiles = 8 bits of info, with a 1 representing a wall.
-        ///
-        fn calcNeighborBitsum(self: *Self, is_wall: bool, x: usize, y: usize) u8 {
-            var result: u8 = 0;
-            inline for (self.getMooreNeighborhood(x, y), 0..) |neighbor_is_wall, i| {
-                if (is_wall == neighbor_is_wall) {
-                    result += 1 << i;
-                }
-            }
-            return result;
+        fn getMooreNeighborhood(self: *Self, x: usize, y: usize) NeighborTiles {
+            return .{
+                .top_left = x > 0 and y > 0 and self.tiles.get(x - 1, y - 1).kind == .wall,
+                .top = y > 0 and self.tiles.get(x, y - 1).kind == .wall,
+                .top_right = x < width - 1 and y > 0 and self.tiles.get(x + 1, y - 1).kind == .wall,
+                .left = x > 0 and self.tiles.get(x - 1, y).kind == .wall,
+                .right = x < width - 1 and self.tiles.get(x + 1, y).kind == .wall,
+                .bottom_left = x > 0 and y < height - 1 and self.tiles.get(x - 1, y + 1).kind == .wall,
+                .bottom = y < height - 1 and self.tiles.get(x, y + 1).kind == .wall,
+                .bottom_right = x < width - 1 and y < height - 1 and self.tiles.get(x + 1, y + 1).kind == .wall,
+            };
         }
 
-        fn getMooreNeighborhood(self: *Self, x: usize, y: usize) [8]bool {
-            // TODO: Can return a u8 here (bits) instead. Skip own tile
-            var result: [8]bool = @splat(false);
-
-            // Top row
-            if (x > 0 and y > 0) result[0] = self.tiles.get(x - 1, y - 1).is_wall;
-            if (y > 0) result[1] = self.tiles.get(x, y - 1).is_wall;
-            if (x < width - 1 and y > 0) result[2] = self.tiles.get(x + 1, y - 1).is_wall;
-
-            // Middle row
-            if (x > 0) result[3] = self.tiles.get(x - 1, y).is_wall;
-            // NOTE: Skip own tile
-            // if (true) result[4] = self.tiles.get(x, y).is_wall;
-            if (x < width - 1) result[4] = self.tiles.get(x + 1, y).is_wall;
-
-            // Bottom row
-            if (x > 0 and y < height - 1) result[5] = self.tiles.get(x - 1, y + 1).is_wall;
-            if (y < height - 1) result[6] = self.tiles.get(x, y + 1).is_wall;
-            if (x < width - 1 and y < height - 1) result[7] = self.tiles.get(x + 1, y + 1).is_wall;
-
-            return result;
-        }
-
-        pub fn render(self: *Self) void {
-            const window: ArrayWindow = .{
+        fn renderWindow() ArrayWindow {
+            return .{
                 .x = @as(usize, @intFromFloat(@max(0, @floor(Game.camera.viewport.x / tile_size)))),
                 .y = @as(usize, @intFromFloat(@max(0, @floor(Game.camera.viewport.y / tile_size)))),
                 .w = @as(usize, @intFromFloat(@ceil(Game.camera.viewport.w / tile_size))) + 1,
                 .h = @as(usize, @intFromFloat(@ceil(Game.camera.viewport.h / tile_size))) + 1,
             };
+        }
 
+        pub fn renderFloor(self: *Self) void {
             // Render floor tiles
             {
-                var iter = self.tiles.window(window);
+                var iter = self.tiles.window(Self.renderWindow());
                 while (iter.next()) |e| {
                     if (e.t.floor_image_index >= 0) {
                         const sprite_rect = self.floor_tiles_sheet.index(@intCast(e.t.floor_image_index));
@@ -309,10 +367,14 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                     }
                 }
             }
+        }
+
+        pub fn renderWalls(self: *Self) void {
+            const window = Self.renderWindow();
 
             // Render wall tiles
             {
-                var iter = self.tiles.window(window);
+                var iter = self.tiles.window(Self.renderWindow());
                 while (iter.next()) |e| {
                     if (e.t.wall_image_index >= 0) {
                         const sprite_rect = self.wall_tiles_sheet.index(@intCast(e.t.wall_image_index));
@@ -322,15 +384,44 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                             .w = tile_size,
                             .h = tile_size,
                         });
+
+                        // if (e.t.kind == .wall or e.t.kind == .corner) {
+                        //     Game.drawRect(.{
+                        //         .x = @as(f32, @floatFromInt(e.x)) * tile_size,
+                        //         .y = @as(f32, @floatFromInt(e.y)) * tile_size,
+                        //         .w = tile_size,
+                        //         .h = tile_size,
+                        //     }, Color.green);
+                        // }
                     }
                 }
             }
+
+            var iter = self.tiles.window(window);
+            while (iter.next()) |e| {
+                const bitsum: u8 = @bitCast(e.t.neighbors);
+                var buf: [1 + std.fmt.count("{d}", .{std.math.maxInt(i32)})]u8 = undefined;
+                const str = std.fmt.bufPrintZ(&buf, "{d}", .{bitsum}) catch unreachable;
+
+                Game.renderDebugTextInGame(.{
+                    .x = @as(f32, @floatFromInt(e.x)) * tile_size + tile_size * 0.5 - 12,
+                    .y = @as(f32, @floatFromInt(e.y)) * tile_size + tile_size * 0.5 - 4,
+                }, str);
+            }
+
+            // Game.setRenderColor(Color.red);
+            // for (self.lines.items) |line| {
+            //     Game.drawLine(line);
+            // }
         }
 
-        pub fn getPotentialArea(shape: *const CollisionShape, start_loc: Vector, movement: Vector) ArrayWindow {
+        pub fn getPotentialArea(
+            shape: *const CollisionShape,
+            start_loc: Vector,
+            movement: Vector,
+        ) ArrayWindow {
             switch (shape.*) {
                 .aabb => |aabb| {
-                    // Middle of the aabb is its location, need half size from its center.
                     const size = aabb.bottom_right.subtract(aabb.top_left).scale(0.5);
                     const min_x = aabb.top_left.x + @min(start_loc.x, start_loc.x + movement.x) - size.x;
                     const min_y = aabb.bottom_right.y + @min(start_loc.y, start_loc.y + movement.y) - size.y;
@@ -356,6 +447,7 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                         .h = @as(usize, @intFromFloat(@ceil(h / tile_size))) + 1,
                     };
                 },
+                .line => unreachable,
             }
         }
 
@@ -397,8 +489,14 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 };
             }
 
-            fn getTileData(iter: *RaycastIterator, x: usize, y: usize) TileData {
-                return .{ .x = x, .y = y, .tile = iter.map.tiles.get(x, y) };
+            fn getTileData(iter: *RaycastIterator, tile_x: usize, tile_y: usize) TileData {
+                return .{
+                    .x = iter.current_loc.x,
+                    .y = iter.current_loc.y,
+                    .tile_x = tile_x,
+                    .tile_y = tile_y,
+                    .tile = iter.map.tiles.get(tile_x, tile_y),
+                };
             }
 
             fn dispToTile(tile_coord: usize, loc: f32, sign: isize) f32 {
@@ -409,39 +507,45 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             fn determineTile(map: *Self, current_loc: Vector) TileData {
                 const tile_x = @as(usize, @intFromFloat(@floor(current_loc.x / tile_size)));
                 const tile_y = @as(usize, @intFromFloat(@floor(current_loc.y / tile_size)));
-                return .{ .x = tile_x, .y = tile_y, .tile = map.tiles.get(tile_x, tile_y) };
+                return .{
+                    .x = current_loc.x,
+                    .y = current_loc.y,
+                    .tile_x = tile_x,
+                    .tile_y = tile_y,
+                    .tile = map.tiles.get(tile_x, tile_y),
+                };
             }
 
             pub fn next(iter: *RaycastIterator) ?TileData {
                 const return_tile = iter.next_tile;
                 if (return_tile) |rt| {
-                    const disp_x = dispToTile(rt.x, iter.current_loc.x, iter.sign_x);
-                    const disp_y = dispToTile(rt.y, iter.current_loc.y, iter.sign_y);
+                    const disp_x = dispToTile(rt.tile_x, iter.current_loc.x, iter.sign_x);
+                    const disp_y = dispToTile(rt.tile_y, iter.current_loc.y, iter.sign_y);
                     const slope_diff = @abs(disp_y) - @abs(disp_x * iter.slope);
                     if (slope_diff > 0) {
                         iter.current_loc.x += disp_x;
                         iter.current_loc.y += disp_x * iter.slope;
-                        const new_x = @as(isize, @intCast(rt.x)) + iter.sign_x;
+                        const new_x = @as(isize, @intCast(rt.tile_x)) + iter.sign_x;
                         if (new_x < 0 or new_x >= width) {
                             iter.next_tile = null;
                         } else {
-                            iter.next_tile = iter.getTileData(@as(usize, @intCast(new_x)), rt.y);
+                            iter.next_tile = iter.getTileData(@as(usize, @intCast(new_x)), rt.tile_y);
                         }
                     } else if (slope_diff < 0) {
                         iter.current_loc.x += disp_y / iter.slope;
                         iter.current_loc.y += disp_y;
-                        const new_y = @as(isize, @intCast(rt.y)) + iter.sign_y;
+                        const new_y = @as(isize, @intCast(rt.tile_y)) + iter.sign_y;
                         if (new_y < 0 or new_y >= height) {
                             iter.next_tile = null;
                         } else {
-                            iter.next_tile = iter.getTileData(rt.x, @as(usize, @intCast(new_y)));
+                            iter.next_tile = iter.getTileData(rt.tile_x, @as(usize, @intCast(new_y)));
                         }
                     } else {
                         // Going through intersection x and y at the same time
                         iter.current_loc.x += disp_x;
                         iter.current_loc.y += disp_y;
-                        const new_x = @as(isize, @intCast(rt.x)) + iter.sign_x;
-                        const new_y = @as(isize, @intCast(rt.y)) + iter.sign_y;
+                        const new_x = @as(isize, @intCast(rt.tile_x)) + iter.sign_x;
+                        const new_y = @as(isize, @intCast(rt.tile_y)) + iter.sign_y;
                         if (new_x < 0 or new_x >= width or new_y < 0 or new_y >= height) {
                             iter.next_tile = null;
                         } else {
@@ -453,11 +557,149 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                     }
 
                     if (@abs(iter.current_loc.x - iter.start.x) >= @abs(iter.dx)) {
-                        iter.next_tile = null;
+                        if (@abs(iter.current_loc.y - iter.start.y) >= @abs(iter.dy)) {
+                            iter.next_tile = null;
+                        }
                     }
                 }
                 return return_tile;
             }
         };
+
+        pub fn CollisionIterator(T: type) type {
+            return struct {
+                pub const CollisionIter = @This();
+                map: *Self,
+                entity: *T,
+                shape: CollisionShape,
+                dt: f32,
+                is_fast_object: bool,
+
+                pub fn init(map: *Self, entity: *T, shape: CollisionShape, dt: f32) CollisionIter {
+                    return .{
+                        .map = map,
+                        .entity = entity,
+                        .shape = shape,
+                        .dt = dt,
+                        .is_fast_object = entity.velocity.getMagnitude() * dt >= tile_size,
+                    };
+                }
+
+                pub fn next(iter: *CollisionIter) ?CollisionResult {
+                    const delta = iter.entity.velocity.scale(iter.dt);
+                    iter.entity.loc = iter.entity.loc.add(delta);
+
+                    const tile_shape: CollisionShape = Self.collision_shape;
+
+                    // TODO: Get different tiles if iter.entity.is_fast_object
+                    const movement_area = Self.getPotentialArea(&iter.shape, iter.entity.loc, delta);
+
+                    var tile_iter = iter.map.tiles.window(movement_area);
+                    while (tile_iter.next()) |t| {
+                        if (t.t.kind != .wall and t.t.kind != .corner) continue;
+
+                        const tile_loc = vector(
+                            @as(f32, @floatFromInt(t.x)) * Self.tile_size,
+                            @as(f32, @floatFromInt(t.y)) * Self.tile_size,
+                        );
+                        return sat.collides(
+                            Game.alloc,
+                            iter.entity.loc,
+                            iter.shape,
+                            delta,
+                            tile_loc,
+                            tile_shape,
+                            Vector.zero,
+                        );
+                    }
+                    return null;
+                }
+            };
+        }
+
+        fn isVerticalWall(self: *Self, x: usize, y: usize, neighbors: NeighborTiles) ?*Tile {
+            if (y >= height) return null;
+            const t = self.tiles.get(x, y);
+            if (t.isBoundary() and neighbors.right == t.neighbors.right and neighbors.left == t.neighbors.left) {
+                return t;
+            }
+            return null;
+        }
+
+        fn isHorizontalWall(self: *Self, x: usize, y: usize, neighbors: NeighborTiles) ?*Tile {
+            if (x >= width) return null;
+            const t = self.tiles.get(x, y);
+            if (t.isBoundary() and neighbors.top == t.neighbors.top and neighbors.bottom == t.neighbors.bottom) {
+                return t;
+            }
+            return null;
+        }
+
+        pub fn determineLines(self: *Self) std.ArrayList(Line) {
+            var lines: std.ArrayList(Line) = .empty;
+
+            var iter = self.tiles.iterator();
+            while (iter.next()) |e| {
+                const t = e.t;
+                if (!t.isBoundary()) continue;
+
+                if (t.neighbors.left and t.neighbors.right) {
+                    if (self.tiles.get(e.x - 1, e.y).isBoundary()) continue;
+                } else {
+                    // Vertical wall
+                    var vertical_count: usize = 1;
+                    var last_insets: *Insets = &t.insets;
+                    while (self.isVerticalWall(e.x, e.y + vertical_count, t.neighbors)) |ot| {
+                        vertical_count += 1;
+                        last_insets = &ot.insets;
+                    }
+                    if (!t.neighbors.left) {
+                        const p1 = position(e.x, e.y).add(.init(t.insets.left, t.insets.top));
+                        const p2 = position(e.x, e.y + vertical_count).add(.init(last_insets.left, -last_insets.bottom));
+                        lines.append(Game.alloc, .init(p1, p2)) catch unreachable;
+                    } else if (!t.neighbors.right) {
+                        const p1 = position(e.x + 1, e.y).add(.init(-t.insets.right, t.insets.top));
+                        const p2 = position(e.x + 1, e.y + vertical_count).subtract(.init(last_insets.right, last_insets.bottom));
+                        lines.append(Game.alloc, .init(p2, p1)) catch unreachable;
+                    }
+                }
+
+                if (t.neighbors.top and t.neighbors.bottom) {
+                    if (self.tiles.get(e.x, e.y - 1).isBoundary()) continue;
+                } else {
+                    // Horizontal wall
+                    var horizontal_count: usize = 1;
+                    var last_insets: *Insets = &t.insets;
+                    while (self.isHorizontalWall(e.x + horizontal_count, e.y, t.neighbors)) |ot| {
+                        horizontal_count += 1;
+                        last_insets = &ot.insets;
+                    }
+                    if (!t.neighbors.top) {
+                        const p1 = position(e.x, e.y).add(.init(t.insets.left, t.insets.top));
+                        const p2 = position(e.x + horizontal_count, e.y).add(.init(-last_insets.right, last_insets.top));
+                        lines.append(Game.alloc, .init(p2, p1)) catch unreachable;
+                    } else if (!t.neighbors.bottom) {
+                        const p1 = position(e.x, e.y + 1).add(.init(t.insets.left, -t.insets.bottom));
+                        const p2 = position(e.x + horizontal_count, e.y + 1).subtract(.init(last_insets.right, last_insets.bottom));
+                        lines.append(Game.alloc, .init(p1, p2)) catch unreachable;
+                    }
+                }
+
+                Game.drawRect(.{
+                    .x = @as(f32, @floatFromInt(e.x)) * tile_size,
+                    .y = @as(f32, @floatFromInt(e.y)) * tile_size,
+                    .w = tile_size,
+                    .h = tile_size,
+                }, Color.green);
+            }
+            return lines;
+        }
+
+        pub fn position(tile_x: usize, tile_y: usize) Vector {
+            return .init(
+                @as(f32, @floatFromInt(tile_x)) * tile_size,
+                @as(f32, @floatFromInt(tile_y)) * tile_size,
+            );
+        }
     };
 }

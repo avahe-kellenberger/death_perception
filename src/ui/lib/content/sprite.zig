@@ -4,7 +4,7 @@ const sdl = @import("sdl3");
 const Spritesheet = @import("../../../spritesheet.zig").Spritesheet;
 const Vector = @import("../../../math/vector.zig").Vector(f32);
 const Game = @import("../../../game.zig");
-const Insets = @import("../types.zig").Insets;
+const Insets = @import("../../../math/insets.zig").Insets;
 
 pub const SpriteCoord = struct {
     x: u16,
@@ -29,6 +29,7 @@ const SpriteTiles = struct {
     }
 
     pub fn deinit(self: *Self) void {
+        for (self.coords) |coord| Game.alloc.free(coord);
         Game.alloc.free(self.coords);
         self.coords = &.{};
     }

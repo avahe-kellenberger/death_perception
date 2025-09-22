@@ -3,6 +3,7 @@ const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 
 const sdl = @import("sdl3");
+const Window = sdl.video.Window;
 const Renderer = sdl.render.Renderer;
 const Texture = sdl.render.Texture;
 const FRect = sdl.rect.FRect;
@@ -40,12 +41,27 @@ pub const GameState = enum {
     test_ui,
 };
 
+pub const UpdateFrame = struct {
+    /// The frame number in the frame sequence.
+    /// This sequence can be reset when client and server coordinate to do so (e.g. game level/map change).
+    /// NOTE: At 100fps, it'll take over a year for this number to overflow.
+    num: u32 = 1,
+
+    /// The time (in seconds) since the frame sequence was reset.
+    time: f32 = 0,
+
+    /// The delta time (in seconds) since the last frame.
+    dt: f32 = 0,
+};
+
 pub var observed_fps: f32 = 0;
 
 pub var alloc: Allocator = undefined;
 pub var mutex: std.Thread.Mutex = .{};
-pub var state: GameState = .main_menu;
+pub var window: Window = undefined;
 pub var renderer: Renderer = undefined;
+pub var frame: UpdateFrame = .{};
+pub var state: GameState = .join_game;
 pub var camera: Camera = undefined;
 pub var bg_color: sdl.pixels.Color = .{};
 pub const scale: f32 = 1.0;
@@ -55,8 +71,9 @@ var level: Level1 = undefined;
 
 pub var is_server: bool = false;
 
-pub fn init(_alloc: Allocator, _renderer: Renderer, _camera: Camera) void {
+pub fn init(_alloc: Allocator, _window: Window, _renderer: Renderer, _camera: Camera) void {
     alloc = _alloc;
+    window = _window;
     renderer = _renderer;
     camera = _camera;
 
@@ -71,6 +88,8 @@ pub fn init(_alloc: Allocator, _renderer: Renderer, _camera: Camera) void {
 pub fn deinit() void {
     level.deinit();
     MainMenu.deinit();
+    Lobby.deinit();
+    JoinGame.deinit();
 }
 
 pub fn input(event: sdl.events.Event) void {

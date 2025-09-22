@@ -18,7 +18,7 @@ pub const String = union(enum) {
 
     /// Use string data to create an owned copy.
     pub fn clone(data: []const u8) Self {
-        return .take(Game.alloc.dupe(u8, data));
+        return .take(Game.alloc.dupe(u8, data) catch unreachable);
     }
 
     /// Free string data if owned.

@@ -16,14 +16,16 @@ const Size = types.Size;
 pub const ComponentID = u32;
 const ChildrenMap = std.array_hash_map.AutoArrayHashMapUnmanaged(ComponentID, Component);
 
-pub fn EventSpec(comptime Event: type) type {
-    return _EventSpec(Event, *anyopaque);
-}
+pub const EventContext = union(enum) {
+    none,
+    u32: u32,
+    ptr: *anyopaque,
+};
 
-fn _EventSpec(comptime Event: type, comptime Context: type) type {
+pub fn EventSpec(comptime Event: type) type {
     return struct {
-        handler: *const fn (comp: *Component, event: Event, ctx: Context) void,
-        context: Context,
+        handler: *const fn (comp: *Component, event: Event, ctx: EventContext) void,
+        context: EventContext = .none,
     };
 }
 
@@ -48,7 +50,7 @@ var next_id: ComponentID = 1;
 pub const Component = struct {
     const Self = @This();
 
-    _id: u32,
+    id: u32,
 
     // Top-down design: child components cannot cause their parent components to resize.
     _parent: ?*Component = null,
@@ -60,7 +62,7 @@ pub const Component = struct {
     _margin: Insets = .zero,
     _padding: Insets = .zero,
     _border_width: f32 = 0.0,
-    _layout: packed struct {
+    _layout: packed struct(u12) {
         /// The display mode of the component.
         mode: DisplayMode = .visible,
         /// How child components should be aligned along the horizontal axis.
@@ -72,7 +74,9 @@ pub const Component = struct {
         /// The validation status of the component layout.
         status: ValidationStatus = .invalid,
         // Whether the component accepts input events.
-        input: bool = false,
+        input_enabled: bool = false,
+        // Whether the component can become focused.
+        focus_enabled: bool = false,
     } = .{},
     _bounds: Insets = .zero, // Bounds including padding, excluding margin.
 
@@ -86,11 +90,16 @@ pub const Component = struct {
     on_mouse_motion: ?EventSpec(sdl.events.MouseMotion) = null,
     on_mouse_enter: ?EventSpec(sdl.events.MouseMotion) = null,
     on_mouse_exit: ?EventSpec(sdl.events.MouseMotion) = null,
+    on_key: ?EventSpec(sdl.events.Keyboard) = null,
+    on_text: ?EventSpec(sdl.events.TextInput) = null,
+    on_focus: ?EventSpec(sdl.events.MouseButton) = null,
+    on_blur: ?EventSpec(sdl.events.MouseButton) = null,
+    on_update: ?EventSpec(f32) = null,
 
     pub fn init() Self {
         defer next_id += 1;
         return .{
-            ._id = next_id,
+            .id = next_id,
         };
     }
 
@@ -105,11 +114,24 @@ pub const Component = struct {
 
     /// Add a child component to this parent component.
     /// Ownership of the component is transferred to the parent component.
+    /// If the child component is already added to a parent component, then this function panics.
     pub fn add(self: *Self, child: Component) void {
+        if (child._parent != null) @panic("Child component already has parent");
+
         var new_child = child;
         new_child._parent = self;
-        self._children.put(Game.alloc, new_child._id, new_child) catch unreachable;
+
+        const entry = self._children.getOrPut(Game.alloc, new_child.id) catch unreachable;
+        if (entry.found_existing) @panic("Component already exists as a child of this parent");
+        entry.value_ptr.* = new_child;
+
+        self.relinkChildren();
         self.setLayoutStatus(.invalid);
+    }
+
+    /// Get a constant pointer to a child component.
+    pub fn get(self: *Self, id: ComponentID) ?*Self {
+        return self._children.getPtr(id);
     }
 
     /// Remove a child component from this parent component.
@@ -125,13 +147,32 @@ pub const Component = struct {
     /// Caller acquires ownership over removed child component.
     pub fn fetchRemove(self: *Self, id: ComponentID) ?Component {
         if (self._children.fetchOrderedRemove(id)) |removed| {
+            self.relinkChildren();
             self.setLayoutStatus(.invalid);
-            return removed.value;
+            var comp = removed.value;
+            comp._parent = null;
+            return comp;
         }
         return null;
     }
 
-    pub fn setLayoutStatus(self: *Self, new_layout_status: ValidationStatus) void {
+    /// Whenever the `children` data structure changes, it may reallocate underlying memory
+    /// and require `parent` pointers to be updated.
+    fn relinkChildren(self: *Self) void {
+        for (self._children.values()) |*parent| {
+            parent.updateParentPointers();
+        }
+    }
+
+    /// Whenever the memory location of a component changes,
+    /// the `parent` pointers of their children must be updated.
+    fn updateParentPointers(parent: *Self) void {
+        for (parent._children.values()) |*child| {
+            child._parent = parent;
+        }
+    }
+
+    fn setLayoutStatus(self: *Self, new_layout_status: ValidationStatus) void {
         self._layout.status = new_layout_status;
         if (new_layout_status != .valid) {
             if (self._parent) |p| {
@@ -140,6 +181,10 @@ pub const Component = struct {
                 }
             }
         }
+    }
+
+    pub fn getDisplayMode(self: *const Self) DisplayMode {
+        return self._layout.mode;
     }
 
     pub fn setDisplayMode(self: *Self, mode: DisplayMode) void {
@@ -304,6 +349,22 @@ pub const Component = struct {
         }
     }
 
+    pub fn enableInput(self: *Self) void {
+        self._layout.input_enabled = true;
+    }
+
+    pub fn enableFocus(self: *Self) void {
+        self._layout.focus_enabled = true;
+    }
+
+    pub fn isFocused(self: *const Self) bool {
+        return self == focused_component;
+    }
+
+    pub fn bounds(self: *const Self) *const Insets {
+        return &self._bounds;
+    }
+
     fn validateLayout(self: *Self) void {
         if (self._layout.status == .valid) return;
 
@@ -329,10 +390,6 @@ pub const Component = struct {
         }
     }
 
-    pub fn enableInput(self: *Self) void {
-        self._layout.input = true;
-    }
-
     /// Find the deepest component at the given point that can accept input events.
     fn findDeepestComponentContainingPoint(self: *Self, x: f32, y: f32) ?*Self {
         // Check conditions that affect child components too
@@ -349,14 +406,23 @@ pub const Component = struct {
                 }
             }
             // If no child component produces a hit, try the current component
-            if (self._layout.input) {
+            if (self._layout.input_enabled) {
                 return self;
             }
         }
         return null;
     }
 
-    pub fn render(self: *const Self, parent_bounds: Insets) void {
+    fn update(self: *Self, dt: f32) void {
+        if (self.on_update) |spec| {
+            spec.handler(self, dt, spec.context);
+        }
+        for (self._children.values()) |*child| {
+            child.update(dt);
+        }
+    }
+
+    fn render(self: *const Self, parent_bounds: Insets) void {
         if (self._layout.mode != .visible) return;
 
         if (self._bounds.left >= parent_bounds.right or
@@ -404,16 +470,34 @@ pub const Component = struct {
 };
 
 /// Keeps track of the deepest hovered component.
-/// This is used to calculate and generated enter and exit events.
+/// This is used to calculate and generate enter and exit events.
 var hovered_component: ?*Component = null;
 
-pub fn handleInputEvent(root: *Component, event: sdl.events.Event) void {
+/// Keeps track of the focused component.
+/// This is used to calculate and generate focus and blur events.
+var focused_component: ?*Component = null;
+
+fn _handleInputEvent(root: *Component, event: sdl.events.Event) void {
     switch (event) {
         .mouse_motion => |mme| {
             handleMouseMotion(root, mme);
         },
         .mouse_button_down, .mouse_button_up => |mbe| {
             handleMouseButton(root, mbe);
+        },
+        .key_down, .key_up => |ke| {
+            if (focused_component) |focused| {
+                if (focused.on_key) |spec| {
+                    spec.handler(focused, ke, spec.context);
+                }
+            }
+        },
+        .text_input => |te| {
+            if (focused_component) |focused| {
+                if (focused.on_text) |spec| {
+                    spec.handler(focused, te, spec.context);
+                }
+            }
         },
         else => {},
     }
@@ -424,6 +508,16 @@ fn handleMouseButton(root: *Component, mouse_button: sdl.events.MouseButton) voi
         if (comp.on_mouse_button) |spec| {
             spec.handler(comp, mouse_button, spec.context);
         }
+        if (focused_component) |fc| {
+            if (fc != comp) {
+                handleBlur(fc, mouse_button);
+                handleFocus(comp, mouse_button);
+            }
+        } else {
+            handleFocus(comp, mouse_button);
+        }
+    } else if (focused_component) |fc| {
+        handleBlur(fc, mouse_button);
     }
 }
 
@@ -459,10 +553,60 @@ fn handleMouseExit(comp: *Component, event: sdl.events.MouseMotion) void {
     }
 }
 
-/// Render a root component to the screen
-pub fn render(root: *Component, width: f32, height: f32) void {
-    root.setWidth(width);
-    root.setHeight(height);
-    root.validateLayout();
-    root.render(Insets.inf);
+fn handleFocus(comp: *Component, event: sdl.events.MouseButton) void {
+    if (!comp._layout.focus_enabled) return;
+    focused_component = comp;
+    if (comp.on_focus) |spec| {
+        spec.handler(comp, event, spec.context);
+    }
 }
+
+fn handleBlur(comp: *Component, event: sdl.events.MouseButton) void {
+    focused_component = null;
+    if (comp.on_blur) |spec| {
+        spec.handler(comp, event, spec.context);
+    }
+}
+
+pub const Root = struct {
+    const Self = @This();
+
+    _comp: ?Component = null,
+
+    pub fn deinit(self: *Self) void {
+        if (self._comp) |*comp| {
+            comp.deinit();
+            self._comp = null;
+        }
+    }
+
+    pub fn set(self: *Self, comp: Component) void {
+        self._comp = comp;
+        if (self._comp) |*ptr| {
+            Component.updateParentPointers(ptr);
+        }
+    }
+
+    pub fn handleInputEvent(self: *Self, event: sdl.events.Event) void {
+        if (self._comp) |*comp| {
+            _handleInputEvent(comp, event);
+        }
+    }
+
+    /// Update the component tree.
+    pub fn update(self: *Self, dt: f32) void {
+        if (self._comp) |*comp| {
+            comp.update(dt);
+        }
+    }
+
+    /// Render a root component to the screen
+    pub fn render(self: *Self, width: f32, height: f32) void {
+        if (self._comp) |*comp| {
+            comp.setWidth(width);
+            comp.setHeight(height);
+            comp.validateLayout();
+            comp.render(Insets.inf);
+        }
+    }
+};

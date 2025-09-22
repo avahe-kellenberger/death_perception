@@ -8,7 +8,7 @@ const UIComponent = ui.Component;
 
 const Input = @import("../input.zig");
 
-var root: ?UIComponent = null;
+var root: ui.Root = .{};
 var fit: bool = false;
 
 pub fn init() void {
@@ -96,17 +96,15 @@ pub fn init() void {
     };
     center_center.enableInput();
     center_center.on_mouse_enter = .{
-        .context = undefined,
         .handler = struct {
-            fn handler(comp: *UIComponent, _: sdl.events.MouseMotion, _: *anyopaque) void {
+            fn handler(comp: *UIComponent, _: sdl.events.MouseMotion, _: ui.EventContext) void {
                 comp.background_color = .{ .b = 255 };
             }
         }.handler,
     };
     center_center.on_mouse_exit = .{
-        .context = undefined,
         .handler = struct {
-            fn handler(comp: *UIComponent, _: sdl.events.MouseMotion, _: *anyopaque) void {
+            fn handler(comp: *UIComponent, _: sdl.events.MouseMotion, _: ui.EventContext) void {
                 comp.background_color = .{ .r = 255 };
             }
         }.handler,
@@ -217,25 +215,19 @@ pub fn init() void {
     r.setPadding(50);
     r.add(box);
 
-    root = r;
+    root.set(r);
 }
 
 pub fn deinit() void {
-    if (root) |*r| {
-        r.deinit();
-        root = null;
-    }
+    root.deinit();
 }
 
 pub fn input(event: sdl.events.Event) void {
-    if (root) |*r| {
-        ui.handleInputEvent(r, event);
-    }
+    root.handleInputEvent(event);
 }
 
 pub fn update(frame_delay: f32) void {
-    // TODO
-    _ = frame_delay;
+    root.update(frame_delay);
 
     if (Input.isKeyPressed(.f)) {
         fit = !fit;
@@ -244,7 +236,5 @@ pub fn update(frame_delay: f32) void {
 }
 
 pub fn render(width: f32, height: f32) void {
-    if (root) |*r| {
-        ui.render(r, width, height);
-    }
+    root.render(width, height);
 }

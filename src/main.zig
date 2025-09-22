@@ -74,6 +74,7 @@ fn run() !void {
 
     Game.init(
         Game.alloc,
+        window,
         renderer,
         Camera.init(.{ .x = 0, .y = 0 }, .{
             .x = @floatFromInt(window_size.width),
@@ -85,13 +86,11 @@ fn run() !void {
     while (Game.state != .quit) {
         // Delay to limit the FPS
         const dt = fps_capper.delay();
-        Game.observed_fps = fps_capper.getObservedFps();
 
         Input.resetFrameSpecificState();
         while (sdl.events.poll()) |event| {
             switch (event) {
-                .key_up, .key_down => try Input.update(event),
-                .mouse_motion, .mouse_button_up, .mouse_button_down => {
+                .mouse_motion, .mouse_button_up, .mouse_button_down, .key_up, .key_down, .text_input => {
                     try Input.update(event);
                     Game.input(event);
                 },
@@ -111,6 +110,12 @@ fn run() !void {
         {
             Game.mutex.lock();
             defer Game.mutex.unlock();
+
+            Game.observed_fps = fps_capper.getObservedFps();
+            Game.frame.num += 1;
+            Game.frame.time = @floatCast(@as(f64, @floatFromInt(fps_capper.elapsed_ns)) / @as(f64, 1_000_000_000.0));
+            Game.frame.dt = dt;
+
             Game.update(dt);
             Game.render();
         }

@@ -5,16 +5,19 @@ const Allocator = std.mem.Allocator;
 
 const sdl = @import("sdl3");
 
+const Game = @import("../game.zig");
+
 const ui = @import("./lib/component.zig");
 const UIComponent = ui.Component;
+
+const Button = @import("./components/button.zig").Button;
 
 const Color = @import("../color.zig").Color;
 const Input = @import("../input.zig");
 const t = @import("./lib/content/sprite.zig").SpriteCoord.xy;
 const Spritesheet = @import("../spritesheet.zig").Spritesheet;
-const Game = @import("../game.zig");
 
-var root: ?UIComponent = null;
+var root: ui.Root = .{};
 
 var background_texture: ?sdl.render.Texture = null;
 
@@ -78,11 +81,10 @@ pub fn init() void {
     menu.setMargin(100);
     menu.setWidth(250);
 
-    var new_game_button = createMenuButton("New Game");
+    var new_game_button = Button("New Game");
     new_game_button.on_mouse_button = .{
-        .context = undefined,
         .handler = struct {
-            fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: *anyopaque) void {
+            fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: ui.EventContext) void {
                 // TODO should animate going into the door in the background
                 Game.state = .lobby;
             }
@@ -90,22 +92,20 @@ pub fn init() void {
     };
     menu.add(new_game_button);
 
-    var load_game_button = createMenuButton("Load Game");
+    var load_game_button = MenuButton("Load Game");
     load_game_button.on_mouse_button = .{
-        .context = undefined,
         .handler = struct {
-            fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: *anyopaque) void {
+            fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: ui.EventContext) void {
                 // TODO should animate going into the door in the background
             }
         }.handler,
     };
     menu.add(load_game_button);
 
-    var join_game_button = createMenuButton("Join Game");
+    var join_game_button = MenuButton("Join Game");
     join_game_button.on_mouse_button = .{
-        .context = undefined,
         .handler = struct {
-            fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: *anyopaque) void {
+            fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: ui.EventContext) void {
                 // TODO should animate going into the door in the background
                 Game.state = .join_game;
             }
@@ -113,22 +113,20 @@ pub fn init() void {
     };
     menu.add(join_game_button);
 
-    var settings_button = createMenuButton("Settings");
+    var settings_button = MenuButton("Settings");
     settings_button.on_mouse_button = .{
-        .context = undefined,
         .handler = struct {
-            fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: *anyopaque) void {
+            fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: ui.EventContext) void {
                 // TODO display main menu settings
             }
         }.handler,
     };
     menu.add(settings_button);
 
-    var quit_button = createMenuButton("Quit");
+    var quit_button = MenuButton("Quit");
     quit_button.on_mouse_button = .{
-        .context = undefined,
         .handler = struct {
-            fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: *anyopaque) void {
+            fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: ui.EventContext) void {
                 Game.state = .quit;
             }
         }.handler,
@@ -142,14 +140,11 @@ pub fn init() void {
     r.add(background);
     r.add(foreground);
 
-    root = r;
+    root.set(r);
 }
 
 pub fn deinit() void {
-    if (root) |*r| {
-        r.deinit();
-        root = null;
-    }
+    root.deinit();
     if (background_texture) |*bs| {
         bs.deinit();
         background_texture = null;
@@ -157,54 +152,19 @@ pub fn deinit() void {
 }
 
 pub fn input(event: sdl.events.Event) void {
-    if (root) |*r| {
-        ui.handleInputEvent(r, event);
-    }
+    root.handleInputEvent(event);
 }
 
 pub fn update(frame_delay: f32) void {
-    // TODO
-    _ = frame_delay;
+    root.update(frame_delay);
 }
 
 pub fn render(width: f32, height: f32) void {
-    if (root) |*r| {
-        ui.render(r, width, height);
-    }
+    root.render(width, height);
 }
 
-fn createMenuButton(comptime text: []const u8) UIComponent {
-    const button_color: Color = .{ .r = 11, .g = 50, .b = 69 };
-    var button = UIComponent.init();
-    button.setHeight(60);
+fn MenuButton(comptime text: []const u8) UIComponent {
+    var button = Button(text);
     button.setMarginInsets(.{ .bottom = 25 });
-    button.background_color = button_color;
-    button.content = .{
-        .text = .{
-            .string = .borrow(text),
-            .align_h = .center,
-            .align_v = .center,
-            .color = .white,
-        },
-    };
-    button.enableInput();
-    button.on_mouse_enter = .{
-        .context = undefined,
-        .handler = struct {
-            fn handler(comp: *UIComponent, _: sdl.events.MouseMotion, _: *anyopaque) void {
-                var hover_color = button_color;
-                hover_color.a = 100;
-                comp.background_color = hover_color;
-            }
-        }.handler,
-    };
-    button.on_mouse_exit = .{
-        .context = undefined,
-        .handler = struct {
-            fn handler(comp: *UIComponent, _: sdl.events.MouseMotion, _: *anyopaque) void {
-                comp.background_color = button_color;
-            }
-        }.handler,
-    };
     return button;
 }

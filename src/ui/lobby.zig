@@ -11,6 +11,8 @@ const Game = @import("../game.zig");
 const ui = @import("./lib/component.zig");
 const UIComponent = ui.Component;
 
+const Button = @import("./components/button.zig").Button;
+
 const Color = @import("../color.zig").Color;
 const Input = @import("../input.zig");
 const t = @import("./lib/content/sprite.zig").SpriteCoord.xy;
@@ -18,7 +20,7 @@ const Spritesheet = @import("../spritesheet.zig").Spritesheet;
 
 const Server = @import("../net/server.zig");
 
-var root: ?UIComponent = null;
+var root: ui.Root = .{};
 
 var background_texture: ?sdl.render.Texture = null;
 
@@ -109,12 +111,11 @@ pub fn init() void {
     buttons.setMarginInsets(.{ .top = 50 });
     buttons.setHeight(60);
 
-    var multiplayer_button = createButton("Start Multiplayer");
+    var multiplayer_button = Button("Start Multiplayer");
     multiplayer_button.setWidth(350);
     multiplayer_button.on_mouse_button = .{
-        .context = undefined,
         .handler = struct {
-            fn handler(comp: *UIComponent, event: sdl.events.MouseButton, _: *anyopaque) void {
+            fn handler(comp: *UIComponent, event: sdl.events.MouseButton, _: ui.EventContext) void {
                 if (event.button == .left and event.down) {
                     if (Server.isListening()) {
                         Server.stop();
@@ -132,12 +133,11 @@ pub fn init() void {
 
     buttons.add(UIComponent.init());
 
-    var start_button = createButton("Start!");
+    var start_button = Button("Start!");
     start_button.setWidth(250);
     start_button.on_mouse_button = .{
-        .context = undefined,
         .handler = struct {
-            fn handler(_: *UIComponent, event: sdl.events.MouseButton, _: *anyopaque) void {
+            fn handler(_: *UIComponent, event: sdl.events.MouseButton, _: ui.EventContext) void {
                 if (event.button == .left and event.down) {
                     Game.state = .in_game;
                 }
@@ -153,14 +153,11 @@ pub fn init() void {
     r.add(background);
     r.add(foreground);
 
-    root = r;
+    root.set(r);
 }
 
 pub fn deinit() void {
-    if (root) |*r| {
-        r.deinit();
-        root = null;
-    }
+    root.deinit();
     if (background_texture) |*bs| {
         bs.deinit();
         background_texture = null;
@@ -168,52 +165,13 @@ pub fn deinit() void {
 }
 
 pub fn input(event: sdl.events.Event) void {
-    if (root) |*r| {
-        ui.handleInputEvent(r, event);
-    }
+    root.handleInputEvent(event);
 }
 
 pub fn update(frame_delay: f32) void {
-    // TODO
-    _ = frame_delay;
+    root.update(frame_delay);
 }
 
 pub fn render(width: f32, height: f32) void {
-    if (root) |*r| {
-        ui.render(r, width, height);
-    }
-}
-
-fn createButton(comptime text: []const u8) UIComponent {
-    const button_color: Color = .{ .r = 11, .g = 50, .b = 69 };
-    var button = UIComponent.init();
-    button.background_color = button_color;
-    button.content = .{
-        .text = .{
-            .string = .borrow(text),
-            .align_h = .center,
-            .align_v = .center,
-            .color = .white,
-        },
-    };
-    button.enableInput();
-    button.on_mouse_enter = .{
-        .context = undefined,
-        .handler = struct {
-            fn handler(comp: *UIComponent, _: sdl.events.MouseMotion, _: *anyopaque) void {
-                var hover_color = button_color;
-                hover_color.a = 100;
-                comp.background_color = hover_color;
-            }
-        }.handler,
-    };
-    button.on_mouse_exit = .{
-        .context = undefined,
-        .handler = struct {
-            fn handler(comp: *UIComponent, _: sdl.events.MouseMotion, _: *anyopaque) void {
-                comp.background_color = button_color;
-            }
-        }.handler,
-    };
-    return button;
+    root.render(width, height);
 }

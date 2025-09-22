@@ -91,20 +91,21 @@ pub fn TextBox() UIComponent {
     };
 
     box.on_text = .{
-        .context = undefined,
+        .context = .{ .u32 = cursor.id },
         .handler = struct {
-            fn handler(comp: *UIComponent, e: sdl.events.TextInput, _: ui.EventContext) void {
+            fn handler(comp: *UIComponent, e: sdl.events.TextInput, ctx: ui.EventContext) void {
                 const curr_str = comp.content.text.string.ref();
                 const append_str = e.text;
                 const new_str = std.mem.concat(Game.alloc, u8, &.{ curr_str, append_str }) catch unreachable;
                 comp.content.text.setString(.take(new_str));
+                positionCursor(comp, ctx.u32);
             }
         }.handler,
     };
     box.on_key = .{
-        .context = undefined,
+        .context = .{ .u32 = cursor.id },
         .handler = struct {
-            fn handler(comp: *UIComponent, e: sdl.events.Keyboard, _: ui.EventContext) void {
+            fn handler(comp: *UIComponent, e: sdl.events.Keyboard, ctx: ui.EventContext) void {
                 if (!e.down) return;
                 const key = e.key orelse return;
                 switch (key) {
@@ -112,6 +113,7 @@ pub fn TextBox() UIComponent {
                         const curr_str = comp.content.text.string.ref();
                         if (curr_str.len > 0) {
                             comp.content.text.setString(.clone(curr_str[0 .. curr_str.len - 1]));
+                            positionCursor(comp, ctx.u32);
                         }
                     },
                     else => {},
@@ -121,4 +123,10 @@ pub fn TextBox() UIComponent {
     };
 
     return box;
+}
+
+fn positionCursor(comp: *UIComponent, cursor_id: u32) void {
+    const cursor_comp = comp.get(cursor_id) orelse return;
+    const text_width: f32 = comp.content.text.measure();
+    cursor_comp.setMarginInsets(.{ .left = text_width });
 }

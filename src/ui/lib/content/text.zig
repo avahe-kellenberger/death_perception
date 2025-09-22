@@ -63,6 +63,15 @@ pub const ComponentText = struct {
         self.clearImage();
     }
 
+    pub fn measure(self: *Self) f32 {
+        const txt = self.string.ref();
+        if (txt.len == 0) return 0;
+        const f = self.loadFont();
+        defer f.deinit();
+        const result = f.measureString(self.string.ref(), 0) catch unreachable;
+        return @floatFromInt(result.measured_width);
+    }
+
     fn clearImage(self: *Self) void {
         if (self._image) |img| {
             img.texture.deinit();
@@ -73,15 +82,19 @@ pub const ComponentText = struct {
         }
     }
 
+    fn loadFont(self: *const Self) ttf.Font {
+        const file_name = Game.alloc.dupeZ(u8, self.font.file) catch unreachable;
+        defer Game.alloc.free(file_name);
+        return ttf.Font.init(file_name, self.font.size) catch unreachable;
+    }
+
     fn ensureImage(self: *const Self) ?Image {
         const text = self.string.ref();
         if (text.len == 0) {
             @constCast(self).clearImage();
         } else if (self._image == null) {
             // Create new SDL objects
-            const file_name = std.heap.smp_allocator.dupeZ(u8, self.font.file) catch unreachable;
-            defer std.heap.smp_allocator.free(file_name);
-            const f = ttf.Font.init(file_name, self.font.size) catch unreachable;
+            const f = self.loadFont();
             defer f.deinit();
             const surface = f.renderTextBlendedWrapped(text, self.color.ttf(), 0) catch unreachable;
             defer surface.deinit();

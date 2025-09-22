@@ -81,7 +81,7 @@ pub fn init() void {
     menu.setMargin(100);
     menu.setWidth(250);
 
-    var new_game_button = Button("New Game");
+    var new_game_button = MenuButton("New Game");
     new_game_button.on_mouse_button = .{
         .handler = struct {
             fn handler(_: *UIComponent, _: sdl.events.MouseButton, _: ui.EventContext) void {

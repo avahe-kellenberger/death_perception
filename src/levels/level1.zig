@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 
 const sdl = @import("sdl3");
@@ -32,18 +33,6 @@ const TileData = @import("../map.zig").TileData;
 const map_size: UVector = .init(120, 77);
 const Map = @import("../map.zig").Map(map_size.x, map_size.y, Game.tile_size);
 
-const spatial_partition_factor: i32 = 4;
-const Partition = @import("../math/spatial_partition.zig").SpatialPartition(
-    Entity,
-    @divFloor(map_size.x, spatial_partition_factor) + 1,
-    @divFloor(map_size.y, spatial_partition_factor) + 1,
-);
-const WallsPartition = @import("../math/spatial_partition.zig").SpatialPartition(
-    CollisionShape,
-    @divFloor(map_size.x, spatial_partition_factor) + 1,
-    @divFloor(map_size.y, spatial_partition_factor) + 1,
-);
-
 pub const Level1 = struct {
     pub const Self = @This();
 
@@ -56,8 +45,6 @@ pub const Level1 = struct {
     player_id: u32 = 0,
 
     map: Map,
-    spatial_partition: Partition,
-    walls_spatial_partition: WallsPartition,
 
     // NOTE: Testing code below, can remove later
     raycast_hit_data: ?TileData = null,
@@ -75,10 +62,6 @@ pub const Level1 = struct {
         const wall_sheet = Spritesheet.init(wall_tiles_image, 3, 5);
 
         const target_size = Game.renderer.getOutputSize() catch unreachable;
-
-        // for (result.map.determineLines()) |*line| {
-        //     result.walls_spatial_partition.insert(0, 0, line);
-        // }
 
         var map: Map = .init(floor_sheet, wall_sheet, 47.0, 2);
 
@@ -100,8 +83,6 @@ pub const Level1 = struct {
             .entities = entities,
             .player_id = player_id,
             .map = map,
-            .spatial_partition = .init(),
-            .walls_spatial_partition = .init(),
             .occlusion_texture = sdl.render.Texture.initWithProperties(Game.renderer, .{
                 .width = target_size.width,
                 .height = target_size.height,
@@ -127,10 +108,19 @@ pub const Level1 = struct {
                 player.update(dt);
                 var iter = Map.CollisionIterator(Player).init(&self.map, player, player.velocity.scale(dt));
                 var mtv: Vector = Vector.zero;
+                var i: u8 = 0;
                 while (iter.next()) |result| {
                     var tmp = result.getMinTranslationVector();
                     if (result.collision_owner_a) tmp = tmp.negate();
                     mtv = mtv.merge(tmp);
+                    i += 1;
+                    if (i >= 100) break;
+                }
+                if (i >= 100) {
+                    std.log.err("Excessive collisions", .{});
+                    if (builtin.mode == .Debug) {
+                        std.process.exit(1);
+                    }
                 }
 
                 player.loc = player.loc.add(player.velocity.scale(dt)).add(mtv);
@@ -203,7 +193,7 @@ pub const Level1 = struct {
             };
         }
 
-        var mesh = occlusion.VisibilityMesh.init(player.loc, self.map.lines.items);
+        var mesh = occlusion.VisibilityMesh.init(player.loc, self.map.walls.items);
         defer mesh.deinit();
         mesh.renderTo(self.occlusion_texture);
         Game.renderer.renderTexture(self.occlusion_texture, null, null) catch unreachable;

@@ -11,28 +11,35 @@ const Node = std.DoublyLinkedList.Node;
 pub fn SpatialPartition(T: type, comptime width: u32, comptime height: u32) type {
     return struct {
         pub const Self = @This();
-        // Should we maybe use a hashmap instead (or two hashmaps, for bidirectional lookup)?
-        // grid: Array2D(std.DoublyLinkedList, width, height),
         grid: std.AutoHashMap(u64, std.ArrayList(*T)),
-
-        // TODO: Support not removing fixed bodies
 
         pub fn init() Self {
             return .{ .grid = .init(Game.alloc) };
         }
 
-        pub fn insert(self: *Self, x: u32, y: u32, t: *T) void {
+        pub fn deinit(self: *Self) void {
+            var list_iter = self.grid.valueIterator();
+            while (list_iter.next()) |*list| {
+                list.*.deinit(Game.alloc);
+            }
+            self.grid.deinit();
+        }
+
+        fn toKey(x: u32, y: u32) u64 {
             var key: u64 = @intCast(x);
             key <<= 32;
             key |= y;
+            return key;
+        }
 
-            const entry = self.grid.getOrPut(key) catch unreachable;
+        pub fn insert(self: *Self, x: u32, y: u32, t: *T) void {
+            const entry = self.grid.getOrPut(toKey(x, y)) catch unreachable;
             if (!entry.found_existing) entry.value_ptr.* = .empty;
             entry.value_ptr.append(Game.alloc, t) catch unreachable;
         }
 
-        pub fn get(self: *Self, x: u32, y: u32) std.DoublyLinkedList {
-            return self.grid.get(x, y);
+        pub fn get(self: *Self, x: u32, y: u32) ?std.ArrayList(*T) {
+            return self.grid.get(toKey(x, y));
         }
 
         pub fn window(self: *Self, win: ArrayWindow) Iterator {
@@ -43,30 +50,31 @@ pub fn SpatialPartition(T: type, comptime width: u32, comptime height: u32) type
             return Iterator.init(self, .{ .x = x, .y = y, .w = w, .h = h });
         }
 
-        const Iterator = struct {
+        pub const Iterator = struct {
             partition: *Self,
 
             // Window
-            win_x: usize, // inclusive
-            win_max_x: usize, // exclusive
-            win_max_y: usize, // exclusive
+            win_x: u32, // inclusive
+            win_max_x: u32, // exclusive
+            win_max_y: u32, // exclusive
 
             // State
-            x: usize,
-            y: usize,
+            x: u32,
+            y: u32,
 
             // Pointers of data that have already been returned
             returned_data: std.AutoHashMap(*T, void),
-            prev_node: ?Node = null,
+            current_list: ?std.ArrayList(*T) = null,
+            current_list_i: usize = 0,
 
             pub fn init(self: *Self, win: ArrayWindow) Iterator {
                 return Iterator{
                     .partition = self,
-                    .win_x = win.x,
-                    .win_max_x = win.x + win.w,
-                    .win_max_y = win.y + win.h,
-                    .x = win.x,
-                    .y = win.y,
+                    .win_x = @intCast(win.x),
+                    .win_max_x = @intCast(win.x + win.w),
+                    .win_max_y = @intCast(win.y + win.h),
+                    .x = @intCast(win.x),
+                    .y = @intCast(win.y),
                     .returned_data = .init(Game.alloc),
                 };
             }
@@ -76,32 +84,147 @@ pub fn SpatialPartition(T: type, comptime width: u32, comptime height: u32) type
             }
 
             pub fn next(self: *Iterator) ?*T {
-                var current_node: ?Node = blk: {
-                    if (self.prev_node) |n| {
-                        break :blk n.next;
-                    } else {
-                        break :blk self.partition.get(self.x, self.y).first;
+                while (self.y < self.win_max_y) {
+                    if (self.current_list == null) {
+                        self.current_list = self.partition.get(self.x, self.y);
+                        self.current_list_i = 0;
+                        if (self.current_list == null) {
+                            self.x += 1;
+                            if (self.x >= self.win_max_x) {
+                                self.y += 1;
+                                self.x = self.win_x;
+                            }
+                            continue;
+                        }
                     }
-                };
 
-                while (current_node) |node| {
-                    defer current_node = node.next;
-                    const t: *T = @fieldParentPtr("node", node);
-                    // We already returned this object
-                    if (self.returned_data.contains(t)) continue;
-                    self.returned_data.put(t, {}) catch unreachable;
-                    return t;
+                    if (self.current_list_i >= self.current_list.?.items.len) {
+                        self.current_list = null;
+                        self.current_list_i = 0;
+                        self.x += 1;
+                        if (self.x >= self.win_max_x) {
+                            self.y += 1;
+                            self.x = self.win_x;
+                        }
+                        continue;
+                    }
+
+                    var t: *T = self.current_list.?.items[self.current_list_i];
+                    defer self.current_list_i += 1;
+                    while (self.returned_data.contains(t)) {
+                        t = self.current_list.?.items[self.current_list_i];
+                        self.current_list_i += 1;
+                    } else return t;
+
+                    if (self.current_list_i >= self.current_list.?.items.len) {
+                        self.current_list = null;
+                        self.current_list_i = 0;
+                        self.x += 1;
+                        if (self.x >= self.win_max_x) {
+                            self.y += 1;
+                            self.x = self.win_x;
+                        }
+                        continue;
+                    }
+
+                    if (self.x >= self.win_max_x) {
+                        self.y += 1;
+                        self.x = self.win_x;
+                        continue;
+                    }
                 }
-
-                defer self.x += 1;
-
-                if (self.x >= self.win_max_x) {
-                    self.x = self.win_x;
-                    self.y += 1;
-                }
-                if (self.y >= self.win_max_y) return null;
-                return self.next();
+                self.deinit();
+                return null;
             }
         };
     };
+}
+
+test {
+    Game.alloc = std.testing.allocator;
+
+    // Testing 3x3 grid:
+    // 1 2 0
+    // 0 2 1
+    // 1 0 1
+
+    const Foo = struct { id: usize };
+    var partition = SpatialPartition(Foo, 3, 3).init();
+    defer partition.deinit();
+
+    // 1 2 0
+    var foo1: Foo = .{ .id = 1 };
+    var foo2: Foo = .{ .id = 2 };
+    var foo3: Foo = .{ .id = 3 };
+    // 1
+    partition.insert(0, 0, &foo1);
+    // 2
+    partition.insert(1, 0, &foo2);
+    partition.insert(1, 0, &foo3);
+
+    // 0 2 1
+    var foo4: Foo = .{ .id = 4 };
+    var foo5: Foo = .{ .id = 5 };
+    var foo6: Foo = .{ .id = 6 };
+    // 0
+    //
+    // 2
+    partition.insert(1, 1, &foo4);
+    partition.insert(1, 1, &foo5);
+    // 1
+    partition.insert(2, 1, &foo6);
+
+    // 1 0 1
+    var foo7: Foo = .{ .id = 7 };
+    var foo8: Foo = .{ .id = 8 };
+    // 1
+    partition.insert(0, 2, &foo7);
+    // 0
+    //
+    // 1
+    partition.insert(2, 2, &foo8);
+
+    // Assertions
+
+    // 1 2 0
+    if (partition.get(0, 0)) |list| {
+        try std.testing.expect(list.items.len == 1);
+    } else try std.testing.expect(false);
+
+    if (partition.get(1, 0)) |list| {
+        try std.testing.expect(list.items.len == 2);
+    } else try std.testing.expect(false);
+
+    try std.testing.expectEqual(null, partition.get(2, 0));
+
+    // 0 2 1
+    try std.testing.expectEqual(null, partition.get(0, 1));
+
+    if (partition.get(1, 1)) |list| {
+        try std.testing.expect(list.items.len == 2);
+    } else try std.testing.expect(false);
+
+    if (partition.get(2, 1)) |list| {
+        try std.testing.expect(list.items.len == 1);
+    } else try std.testing.expect(false);
+
+    // 1 0 1
+    if (partition.get(0, 2)) |list| {
+        try std.testing.expect(list.items.len == 1);
+    } else try std.testing.expect(false);
+
+    try std.testing.expectEqual(null, partition.get(1, 2));
+
+    if (partition.get(2, 2)) |list| {
+        try std.testing.expect(list.items.len == 1);
+    } else try std.testing.expect(false);
+
+    // Verify iterator works properly
+    var iter = partition.window(.{ .x = 0, .y = 0, .w = 3, .h = 3 });
+    var i: usize = 0;
+    while (iter.next()) |foo| {
+        try std.testing.expectEqual(i + 1, foo.id);
+        i += 1;
+    }
+    try std.testing.expectEqual(8, i);
 }

@@ -89,11 +89,7 @@ pub fn SpatialPartition(T: type, comptime width: u32, comptime height: u32) type
                         self.current_list = self.partition.get(self.x, self.y);
                         self.current_list_i = 0;
                         if (self.current_list == null) {
-                            self.x += 1;
-                            if (self.x >= self.win_max_x) {
-                                self.y += 1;
-                                self.x = self.win_x;
-                            }
+                            self.advancePosition();
                             continue;
                         }
                     }
@@ -101,40 +97,36 @@ pub fn SpatialPartition(T: type, comptime width: u32, comptime height: u32) type
                     if (self.current_list_i >= self.current_list.?.items.len) {
                         self.current_list = null;
                         self.current_list_i = 0;
-                        self.x += 1;
-                        if (self.x >= self.win_max_x) {
-                            self.y += 1;
-                            self.x = self.win_x;
-                        }
+                        self.advancePosition();
                         continue;
                     }
 
                     var t: *T = self.current_list.?.items[self.current_list_i];
                     defer self.current_list_i += 1;
+
                     while (self.returned_data.contains(t)) {
-                        t = self.current_list.?.items[self.current_list_i];
                         self.current_list_i += 1;
-                    } else return t;
 
-                    if (self.current_list_i >= self.current_list.?.items.len) {
-                        self.current_list = null;
-                        self.current_list_i = 0;
-                        self.x += 1;
-                        if (self.x >= self.win_max_x) {
-                            self.y += 1;
-                            self.x = self.win_x;
+                        if (self.current_list_i >= self.current_list.?.items.len) {
+                            self.current_list = null;
+                            self.current_list_i = 0;
+                            self.advancePosition();
+                            continue;
                         }
-                        continue;
+                        t = self.current_list.?.items[self.current_list_i];
                     }
-
-                    if (self.x >= self.win_max_x) {
-                        self.y += 1;
-                        self.x = self.win_x;
-                        continue;
-                    }
+                    return t;
                 }
                 self.deinit();
                 return null;
+            }
+
+            fn advancePosition(self: *Iterator) void {
+                self.x += 1;
+                if (self.x >= self.win_max_x) {
+                    self.y += 1;
+                    self.x = self.win_x;
+                }
             }
         };
     };

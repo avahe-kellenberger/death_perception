@@ -65,6 +65,8 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
         Entity,
         @divFloor(width, entity_partition_scale) + 1,
         @divFloor(height, entity_partition_scale) + 1,
+        @intFromFloat(_tile_size),
+        entity_partition_scale,
     );
 
     const walls_partition_scale = 10;
@@ -72,6 +74,8 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
         CollisionShape,
         @divFloor(width, walls_partition_scale) + 1,
         @divFloor(height, walls_partition_scale) + 1,
+        @intFromFloat(_tile_size),
+        walls_partition_scale,
     );
 
     return struct {
@@ -133,12 +137,12 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
 
             for (result.walls.items) |*wall| {
                 const scalar: f32 = @floatFromInt(walls_partition_scale);
-                const x: u32 = @intFromFloat(@min(wall.line.start.x, wall.line.end.x) / scalar);
-                const y: u32 = @intFromFloat(@min(wall.line.start.y, wall.line.end.y) / scalar);
-                const w = @as(u32, @intFromFloat(@abs(wall.line.end.x - wall.line.start.x) / scalar)) + 1;
-                const h = @as(u32, @intFromFloat(@abs(wall.line.end.y - wall.line.start.y) / scalar)) + 1;
+                const x: u32 = @intFromFloat(@floor(@min(wall.line.start.x, wall.line.end.x) / (scalar * tile_size)));
+                const y: u32 = @intFromFloat(@floor(@min(wall.line.start.y, wall.line.end.y) / (scalar * tile_size)));
+                const w = @as(u32, @intFromFloat(@ceil(@abs(wall.line.end.x - wall.line.start.x) / (scalar * tile_size)))) + 1;
+                const h = @as(u32, @intFromFloat(@ceil(@abs(wall.line.end.y - wall.line.start.y) / (scalar * tile_size)))) + 1;
                 for (y..y + h) |y_coord| for (x..x + w) |x_coord| {
-                    result.walls_spatial_partition.insert(
+                    result.walls_spatial_partition.insertAt(
                         @intCast(x_coord),
                         @intCast(y_coord),
                         wall,
@@ -447,23 +451,23 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             // }
 
             Game.setRenderColor(Color.red);
-            // for (self.walls.items) |line| {
-            //     Game.drawLine(line.line);
-            // }
+            self.walls_spatial_partition.render();
 
-            // const player = Game.level.entities.getAs(.player, Game.level.player_id).?;
-            // const area = getPotentialArea(
-            //     .{ .circle = .init(.init(0, -7), 7.0) },
-            //     Game.camera._loc,
-            //     player.velocity.scale(1.0 / 165.0),
-            // );
+            const player = Game.level.entities.getAs(.player, Game.level.player_id).?;
+            const area = getPotentialArea(
+                .{ .circle = .init(.init(0, -7), 7.0) },
+                Game.camera._loc,
+                player.velocity.scale(1.0 / 165.0),
+            );
 
             var wall_iter = self.walls_spatial_partition.window(.{
-                .x = 0,
-                .y = 0,
-                .w = 1000,
-                .h = 1000,
+                .x = area.x / walls_partition_scale,
+                .y = area.y / walls_partition_scale,
+                .w = (area.w / walls_partition_scale) + 1,
+                .h = (area.h / walls_partition_scale) + 1,
             });
+
+            Game.setRenderColor(Color.blue);
             while (wall_iter.next()) |wall| {
                 wall.render(Vector.zero);
             }
@@ -630,61 +634,39 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                 move_vector: Vector,
 
                 pub fn init(map: *Self, entity: *T, move_vector: Vector) CollisionIter {
-                    // TODO: Get different tiles if iter.entity.is_fast_object
-                    // const movement_area = Self.getPotentialArea(T.collision_shape, entity.loc, move_vector);
-                    const wall_iter = map.walls_spatial_partition.window(.{
-                        .x = 0,
-                        .y = 0,
-                        .w = 1000,
-                        .h = 1000,
-                    });
+                    // TODO: Get different collision data if iter.entity.is_fast_object
 
+                    const area = Self.getPotentialArea(T.collision_shape, entity.loc, move_vector);
                     return .{
                         .map = map,
                         .entity = entity,
                         .is_fast_object = move_vector.getMagnitude() >= tile_size,
-                        // .wall_iter = map.walls_spatial_partition.window(movement_area),
-                        .wall_iter = wall_iter,
                         .move_vector = move_vector,
+                        .wall_iter = map.walls_spatial_partition.window(.{
+                            .x = area.x / walls_partition_scale,
+                            .y = area.y / walls_partition_scale,
+                            .w = (area.w / walls_partition_scale) + 1,
+                            .h = (area.h / walls_partition_scale) + 1,
+                        }),
                     };
                 }
 
                 pub fn next(iter: *CollisionIter) ?CollisionResult {
-                    _ = iter;
-                    // while (iter.wall_iter.next()) |wall| {
-                    //     if (sat.collides(
-                    //         Game.alloc,
-                    //         iter.entity.loc,
-                    //         T.collision_shape,
-                    //         iter.move_vector,
-                    //         // B
-                    //         Vector.zero,
-                    //         wall.*,
-                    //         Vector.zero,
-                    //     )) |res| {
-                    //         return res;
-                    //     }
-                    // }
+                    while (iter.wall_iter.next()) |wall| {
+                        if (sat.collides(
+                            Game.alloc,
+                            iter.entity.loc,
+                            T.collision_shape,
+                            iter.move_vector,
+                            // B
+                            Vector.zero,
+                            wall.*,
+                            Vector.zero,
+                        )) |res| {
+                            return res;
+                        }
+                    }
 
-                    // while (iter.tile_iter.next()) |t| {
-                    //     if (!t.t.isBoundary()) continue;
-                    //
-                    //     const tile_loc = vector(
-                    //         @as(f32, @floatFromInt(t.x)) * Self.tile_size,
-                    //         @as(f32, @floatFromInt(t.y)) * Self.tile_size,
-                    //     );
-                    //     if (sat.collides(
-                    //         Game.alloc,
-                    //         iter.entity.loc,
-                    //         T.collision_shape,
-                    //         iter.move_vector,
-                    //         tile_loc,
-                    //         Self.collision_shape,
-                    //         Vector.zero,
-                    //     )) |res| {
-                    //         return res;
-                    //     }
-                    // }
                     return null;
                 }
             };

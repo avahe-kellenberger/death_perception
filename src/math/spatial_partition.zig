@@ -8,9 +8,18 @@ const ArrayWindow = array_2d.ArrayWindow;
 
 const Node = std.DoublyLinkedList.Node;
 
-pub fn SpatialPartition(T: type, comptime width: u32, comptime height: u32) type {
+pub fn SpatialPartition(
+    T: type,
+    comptime width: u32,
+    comptime height: u32,
+    comptime tile_size: u32,
+    comptime tile_scalar: u32,
+) type {
     return struct {
         pub const Self = @This();
+        pub const grid_width = width;
+        pub const grid_height = height;
+
         grid: std.AutoHashMap(u64, std.ArrayList(*T)),
 
         pub fn init() Self {
@@ -32,11 +41,18 @@ pub fn SpatialPartition(T: type, comptime width: u32, comptime height: u32) type
             return key;
         }
 
-        pub fn insert(self: *Self, x: u32, y: u32, t: *T) void {
+        pub fn insertAt(self: *Self, x: u32, y: u32, t: *T) void {
             const entry = self.grid.getOrPut(toKey(x, y)) catch unreachable;
             if (!entry.found_existing) entry.value_ptr.* = .empty;
             entry.value_ptr.append(Game.alloc, t) catch unreachable;
         }
+
+        // pub fn insert(self: *Self, t: *T) void {
+        //     // TODO: Insert based on T.collision_shape
+        //     const entry = self.grid.getOrPut(toKey(x, y)) catch unreachable;
+        //     if (!entry.found_existing) entry.value_ptr.* = .empty;
+        //     entry.value_ptr.append(Game.alloc, t) catch unreachable;
+        // }
 
         pub fn get(self: *Self, x: u32, y: u32) ?std.ArrayList(*T) {
             return self.grid.get(toKey(x, y));
@@ -48,6 +64,17 @@ pub fn SpatialPartition(T: type, comptime width: u32, comptime height: u32) type
             const w = @min(win.w, width - x);
             const h = if (w != 0) @min(win.h, height - y) else 0;
             return Iterator.init(self, .{ .x = x, .y = y, .w = w, .h = h });
+        }
+
+        pub fn render(_: *Self) void {
+            for (0..height) |y| for (0..width) |x| {
+                Game.drawRect(.{
+                    .x = @floatFromInt(x * tile_size * tile_scalar),
+                    .y = @floatFromInt(y * tile_size * tile_scalar),
+                    .w = @floatFromInt(tile_size * tile_scalar),
+                    .h = @floatFromInt(tile_size * tile_scalar),
+                });
+            };
         }
 
         pub const Iterator = struct {
@@ -84,11 +111,12 @@ pub fn SpatialPartition(T: type, comptime width: u32, comptime height: u32) type
             }
 
             pub fn next(self: *Iterator) ?*T {
-                while (self.y < self.win_max_y) {
+                outer: while (self.y < self.win_max_y) {
                     if (self.current_list == null) {
                         self.current_list = self.partition.get(self.x, self.y);
                         self.current_list_i = 0;
                         if (self.current_list == null) {
+                            std.log.err("Nothing at {}, {}", .{ self.x, self.y });
                             self.advancePosition();
                             continue;
                         }
@@ -111,10 +139,14 @@ pub fn SpatialPartition(T: type, comptime width: u32, comptime height: u32) type
                             self.current_list = null;
                             self.current_list_i = 0;
                             self.advancePosition();
-                            continue;
+                            continue :outer;
                         }
                         t = self.current_list.?.items[self.current_list_i];
                     }
+                    std.log.err("x: {}, y: {}, i: {}, len: {}", .{
+                        self.x, self.y, self.current_list_i, self.current_list.?.items.len,
+                    });
+                    self.returned_data.put(t, {}) catch unreachable;
                     return t;
                 }
                 self.deinit();
@@ -127,6 +159,7 @@ pub fn SpatialPartition(T: type, comptime width: u32, comptime height: u32) type
                     self.y += 1;
                     self.x = self.win_x;
                 }
+                std.log.err("advancePosition: {}, {}", .{ self.x, self.y });
             }
         };
     };
@@ -151,8 +184,11 @@ test {
     // 1
     partition.insert(0, 0, &foo1);
     // 2
+    partition.insert(1, 0, &foo1);
     partition.insert(1, 0, &foo2);
     partition.insert(1, 0, &foo3);
+    // 0
+    //
 
     // 0 2 1
     var foo4: Foo = .{ .id = 4 };
@@ -184,7 +220,7 @@ test {
     } else try std.testing.expect(false);
 
     if (partition.get(1, 0)) |list| {
-        try std.testing.expect(list.items.len == 2);
+        try std.testing.expect(list.items.len == 3);
     } else try std.testing.expect(false);
 
     try std.testing.expectEqual(null, partition.get(2, 0));

@@ -377,3 +377,33 @@ test {
         try std.testing.expect(false);
     }
 }
+
+test "circle vs line" {
+    const alloc = std.testing.allocator;
+    const circle: CollisionShape = .{ .circle = .init(Vector.zero, 10) };
+    const circle_loc: Vector = .init(85, 150);
+
+    const line_loc: Vector = Vector.zero;
+    const line: CollisionShape = .{
+        .line = .{
+            .start = .init(100, 100),
+            .end = .init(100, 200),
+        },
+    };
+
+    const move_a: Vector = .init(12, 0);
+    const move_b: Vector = Vector.zero;
+
+    // Circle is 5 pixes from the wall
+    // Move 12 pixels to the right
+    // Overlap of 7 pixels
+
+    if (collides(alloc, circle_loc, circle, move_a, line_loc, line, move_b)) |result| {
+        const mtv = result.getMinTranslationVector();
+        try std.testing.expectEqual(-7, mtv.x);
+        try std.testing.expectEqual(0, mtv.y);
+    } else {
+        // TODO: No collision was detected...
+        try std.testing.expect(false);
+    }
+}

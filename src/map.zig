@@ -616,6 +616,9 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                             wall.*,
                             Vector.zero,
                         )) |res| {
+                            std.log.err("player: {}", .{T.collision_shape.circle.getBounds().translate(iter.entity.loc)});
+                            std.log.err("wall: {}", .{wall.line});
+                            std.log.err("mtv: {}", .{res.getMinTranslationVector().negate()});
                             return res;
                         }
                     }
@@ -642,6 +645,17 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             }
             return null;
         }
+
+        // pub fn determineWalls(_: *Self) std.ArrayList(CollisionShape) {
+        //     var walls: std.ArrayList(CollisionShape) = .empty;
+        //     walls.append(Game.alloc, .{
+        //         .line = .init(
+        //             .init(161, 161),
+        //             .init(161, 240),
+        //         ),
+        //     }) catch unreachable;
+        //     return walls;
+        // }
 
         pub fn determineWalls(self: *Self) std.ArrayList(CollisionShape) {
             var walls: std.ArrayList(CollisionShape) = .empty;

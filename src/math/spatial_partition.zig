@@ -86,12 +86,13 @@ pub fn SpatialPartition(
                     const x2: usize = @intFromFloat(@floor(max_x / (tile_size * tile_scalar)));
                     const y2: usize = @intFromFloat(@floor(max_y / (tile_size * tile_scalar)));
 
-                    return ArrayWindow{
+                    const result = ArrayWindow{
                         .x = x1,
                         .y = y1,
                         .w = x2 - x1 + 1,
                         .h = y2 - y1 + 1,
                     };
+                    return result;
                 },
                 .circle => |circle| {
                     const dest = start_loc.add(movement);
@@ -154,10 +155,6 @@ pub fn SpatialPartition(
                     .y = @intCast(win.y),
                     .returned_data = .init(Game.alloc),
                 };
-                // std.log.err(
-                //     "x {}, y: {}, max_x: {}, max_y: {}",
-                //     .{ result.x, result.y, result.win_max_x, result.win_max_y },
-                // );
                 return result;
             }
 

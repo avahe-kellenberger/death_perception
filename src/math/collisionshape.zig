@@ -20,6 +20,14 @@ pub const CollisionShape = union(enum) {
     circle: Circle,
     line: Line,
 
+    pub fn getBounds(shape: CollisionShape) AABB {
+        switch (shape) {
+            .aabb => |aabb| return aabb,
+            .circle => |circle| return circle.getBounds(),
+            .line => |line| return line.getBounds(),
+        }
+    }
+
     pub fn getProjectionAxesCount(self: Self, other: Self) u32 {
         switch (self) {
             .aabb => return 2,
@@ -168,6 +176,13 @@ pub const AABB = struct {
         };
     }
 
+    pub fn translate(self: Self, delta: Vector) AABB {
+        return AABB{
+            .top_left = self.top_left.add(delta),
+            .bottom_right = self.bottom_right.add(delta),
+        };
+    }
+
     pub fn render(self: Self, parent_loc: Vector) void {
         Game.drawRect(.{
             .x = self.top_left.x + parent_loc.x,
@@ -186,6 +201,13 @@ pub const Circle = struct {
 
     pub fn init(center: Vector, radius: f32) Circle {
         return Circle{ .center = center, .radius = radius };
+    }
+
+    pub fn getBounds(self: Self) AABB {
+        return AABB{
+            .top_left = .init(self.center.x - self.radius, self.center.x - self.radius),
+            .bottom_right = .init(self.center.x + self.radius, self.center.x + self.radius),
+        };
     }
 
     pub fn render(self: Self, parent_loc: Vector) void {
@@ -212,6 +234,13 @@ pub const Line = struct {
 
     pub fn middle(self: Line) Vector {
         return self.start.add(self.end).scale(0.5);
+    }
+
+    pub fn getBounds(self: Self) AABB {
+        return AABB{
+            .top_left = .init(@min(self.start.x, self.end.x), @min(self.start.y, self.end.y)),
+            .bottom_right = .init(@max(self.start.x, self.end.x), @max(self.start.y, self.end.y)),
+        };
     }
 
     pub fn findIntersection(self: *const Self, ray_origin: Vector, direction: Vector, out: *Vector) bool {

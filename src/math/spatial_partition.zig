@@ -6,6 +6,9 @@ const array_2d = @import("../array_2d.zig");
 const Array2D = array_2d.Array2D;
 const ArrayWindow = array_2d.ArrayWindow;
 
+const CollisionShape = @import("collisionshape.zig").CollisionShape;
+const Vector = @import("vector.zig").Vector(f32);
+
 const Node = std.DoublyLinkedList.Node;
 
 pub fn SpatialPartition(
@@ -47,12 +50,12 @@ pub fn SpatialPartition(
             entry.value_ptr.append(Game.alloc, t) catch unreachable;
         }
 
-        // pub fn insert(self: *Self, t: *T) void {
-        //     // TODO: Insert based on T.collision_shape
-        //     const entry = self.grid.getOrPut(toKey(x, y)) catch unreachable;
-        //     if (!entry.found_existing) entry.value_ptr.* = .empty;
-        //     entry.value_ptr.append(Game.alloc, t) catch unreachable;
-        // }
+        pub fn insert(self: *Self, t: *T, collision_shape: CollisionShape, offset: Vector) void {
+            const area = getPotentialArea(collision_shape, offset, Vector.zero);
+            for (area.y..area.y + area.h) |y| for (area.x..area.x + area.w) |x| {
+                self.insertAt(@intCast(x), @intCast(y), t);
+            };
+        }
 
         pub fn get(self: *Self, x: u32, y: u32) ?std.ArrayList(*T) {
             return self.grid.get(toKey(x, y));
@@ -64,6 +67,53 @@ pub fn SpatialPartition(
             const w = @min(win.w, width - x);
             const h = if (w != 0) @min(win.h, height - y) else 0;
             return Iterator.init(self, .{ .x = x, .y = y, .w = w, .h = h });
+        }
+
+        pub fn getPotentialArea(
+            shape: CollisionShape,
+            start_loc: Vector,
+            movement: Vector,
+        ) ArrayWindow {
+            switch (shape) {
+                .aabb => |aabb| {
+                    const min_x = aabb.top_left.x + @min(start_loc.x, start_loc.x + movement.x);
+                    const min_y = aabb.top_left.y + @min(start_loc.y, start_loc.y + movement.y);
+                    const max_x = aabb.bottom_right.x + @max(start_loc.x, start_loc.x + movement.x);
+                    const max_y = aabb.bottom_right.y + @max(start_loc.y, start_loc.y + movement.y);
+
+                    const x1: usize = @intFromFloat(@floor(min_x / (tile_size * tile_scalar)));
+                    const y1: usize = @intFromFloat(@floor(min_y / (tile_size * tile_scalar)));
+                    const x2: usize = @intFromFloat(@floor(max_x / (tile_size * tile_scalar)));
+                    const y2: usize = @intFromFloat(@floor(max_y / (tile_size * tile_scalar)));
+
+                    return ArrayWindow{
+                        .x = x1,
+                        .y = y1,
+                        .w = x2 - x1 + 1,
+                        .h = y2 - y1 + 1,
+                    };
+                },
+                .circle => |circle| {
+                    const dest = start_loc.add(movement);
+                    const min_x = circle.center.x + @min(start_loc.x, dest.x) - circle.radius;
+                    const max_x = circle.center.x + @max(start_loc.x, dest.x) + circle.radius;
+                    const min_y = circle.center.y + @min(start_loc.y, dest.y) - circle.radius;
+                    const max_y = circle.center.y + @max(start_loc.y, dest.y) + circle.radius;
+
+                    const x1: usize = @intFromFloat(@floor(min_x / (tile_size * tile_scalar)));
+                    const y1: usize = @intFromFloat(@floor(min_y / (tile_size * tile_scalar)));
+                    const x2: usize = @intFromFloat(@floor(max_x / (tile_size * tile_scalar)));
+                    const y2: usize = @intFromFloat(@floor(max_y / (tile_size * tile_scalar)));
+
+                    return ArrayWindow{
+                        .x = x1,
+                        .y = y1,
+                        .w = x2 - x1 + 1,
+                        .h = y2 - y1 + 1,
+                    };
+                },
+                .line => |line| return getPotentialArea(.{ .aabb = line.getBounds() }, start_loc, movement),
+            }
         }
 
         pub fn render(_: *Self) void {
@@ -95,7 +145,7 @@ pub fn SpatialPartition(
             current_list_i: usize = 0,
 
             pub fn init(self: *Self, win: ArrayWindow) Iterator {
-                return Iterator{
+                const result = Iterator{
                     .partition = self,
                     .win_x = @intCast(win.x),
                     .win_max_x = @intCast(win.x + win.w),
@@ -104,6 +154,11 @@ pub fn SpatialPartition(
                     .y = @intCast(win.y),
                     .returned_data = .init(Game.alloc),
                 };
+                // std.log.err(
+                //     "x {}, y: {}, max_x: {}, max_y: {}",
+                //     .{ result.x, result.y, result.win_max_x, result.win_max_y },
+                // );
+                return result;
             }
 
             pub fn deinit(self: *Iterator) void {
@@ -116,7 +171,6 @@ pub fn SpatialPartition(
                         self.current_list = self.partition.get(self.x, self.y);
                         self.current_list_i = 0;
                         if (self.current_list == null) {
-                            std.log.err("Nothing at {}, {}", .{ self.x, self.y });
                             self.advancePosition();
                             continue;
                         }
@@ -143,9 +197,6 @@ pub fn SpatialPartition(
                         }
                         t = self.current_list.?.items[self.current_list_i];
                     }
-                    std.log.err("x: {}, y: {}, i: {}, len: {}", .{
-                        self.x, self.y, self.current_list_i, self.current_list.?.items.len,
-                    });
                     self.returned_data.put(t, {}) catch unreachable;
                     return t;
                 }
@@ -159,7 +210,6 @@ pub fn SpatialPartition(
                     self.y += 1;
                     self.x = self.win_x;
                 }
-                std.log.err("advancePosition: {}, {}", .{ self.x, self.y });
             }
         };
     };
@@ -174,7 +224,7 @@ test {
     // 1 0 1
 
     const Foo = struct { id: usize };
-    var partition = SpatialPartition(Foo, 3, 3).init();
+    var partition = SpatialPartition(Foo, 3, 3, 1, 1).init();
     defer partition.deinit();
 
     // 1 2 0
@@ -182,11 +232,11 @@ test {
     var foo2: Foo = .{ .id = 2 };
     var foo3: Foo = .{ .id = 3 };
     // 1
-    partition.insert(0, 0, &foo1);
+    partition.insertAt(0, 0, &foo1);
     // 2
-    partition.insert(1, 0, &foo1);
-    partition.insert(1, 0, &foo2);
-    partition.insert(1, 0, &foo3);
+    partition.insertAt(1, 0, &foo1);
+    partition.insertAt(1, 0, &foo2);
+    partition.insertAt(1, 0, &foo3);
     // 0
     //
 
@@ -197,20 +247,20 @@ test {
     // 0
     //
     // 2
-    partition.insert(1, 1, &foo4);
-    partition.insert(1, 1, &foo5);
+    partition.insertAt(1, 1, &foo4);
+    partition.insertAt(1, 1, &foo5);
     // 1
-    partition.insert(2, 1, &foo6);
+    partition.insertAt(2, 1, &foo6);
 
     // 1 0 1
     var foo7: Foo = .{ .id = 7 };
     var foo8: Foo = .{ .id = 8 };
     // 1
-    partition.insert(0, 2, &foo7);
+    partition.insertAt(0, 2, &foo7);
     // 0
     //
     // 1
-    partition.insert(2, 2, &foo8);
+    partition.insertAt(2, 2, &foo8);
 
     // Assertions
 

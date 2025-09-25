@@ -200,6 +200,20 @@ pub const Level1 = struct {
 
         self.map.renderWalls();
 
+        const area = @TypeOf(self.map.walls_spatial_partition).getPotentialArea(
+            Player.collision_shape,
+            player.loc,
+            player.velocity.scale(1 / 165),
+        );
+        Game.renderer.setDrawBlendMode(.blend) catch unreachable;
+        Game.setRenderColor(Color.red.with(.{ .a = 25 }));
+        Game.fillRect(.{
+            .x = @as(f32, @floatFromInt(area.x * 10)) * 16.0,
+            .y = @as(f32, @floatFromInt(area.y * 10)) * 16.0,
+            .w = @as(f32, @floatFromInt(area.w * 10)) * 16.0,
+            .h = @as(f32, @floatFromInt(area.h * 10)) * 16.0,
+        });
+
         Game.setRenderColor(.red);
         Player.collision_shape.render(player.loc);
     }

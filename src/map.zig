@@ -415,23 +415,6 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                     }
                 }
             }
-
-            Game.setRenderColor(Color.red);
-            self.walls_spatial_partition.render();
-
-            const player = Game.level.entities.getAs(.player, Game.level.player_id).?;
-            const area = @TypeOf(self.walls_spatial_partition).getPotentialArea(
-                @TypeOf(player.*).collision_shape,
-                player.loc,
-                Vector.zero,
-            );
-
-            Game.setRenderColor(Color.blue);
-            var wall_iter = self.walls_spatial_partition.window(area);
-            defer wall_iter.deinit();
-            while (wall_iter.next()) |wall| {
-                wall.render(Vector.zero);
-            }
         }
 
         pub fn getPotentialArea(

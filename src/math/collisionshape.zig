@@ -66,7 +66,7 @@ pub const CollisionShape = union(enum) {
                     circleToLineProjectionAxes(verticies, circle, line, to_other);
                 },
             },
-            .line => |line| verticies.appendAssumeCapacity(line.end.subtract(line.start).perpRight()),
+            .line => |line| verticies.appendAssumeCapacity(line.end.subtract(line.start).perpRight().normalize()),
         }
     }
 
@@ -205,8 +205,8 @@ pub const Circle = struct {
 
     pub fn getBounds(self: Self) AABB {
         return AABB{
-            .top_left = .init(self.center.x - self.radius, self.center.x - self.radius),
-            .bottom_right = .init(self.center.x + self.radius, self.center.x + self.radius),
+            .top_left = .init(self.center.x - self.radius, self.center.y - self.radius),
+            .bottom_right = .init(self.center.x + self.radius, self.center.y + self.radius),
         };
     }
 
@@ -245,7 +245,7 @@ pub const Line = struct {
 
     pub fn findIntersection(self: *const Self, ray_origin: Vector, direction: Vector, out: *Vector) bool {
         const v2 = self.end.subtract(self.start);
-        const v3 = direction.perpLeft();
+        const v3 = direction.perpRight().normalize();
 
         const dot = v2.dotProduct(v3);
         if (dot == 0) {

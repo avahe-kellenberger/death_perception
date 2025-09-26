@@ -111,22 +111,12 @@ pub const Level1 = struct {
                 var i: u8 = 0;
                 while (iter.next()) |result| {
                     var tmp = result.getMinTranslationVector();
-                    if (!result.collision_owner_a) tmp = tmp.negate();
+                    if (result.collision_owner_a) tmp = tmp.negate();
                     mtv = mtv.merge(tmp);
                     i += 1;
                     if (i >= 100) break;
-                    iter.wall_iter.deinit();
-                    break;
+                    unreachable;
                 }
-                // player = .{
-                //     .top_left = .{ .x = 568.70105, .y = 548.7699 },
-                //     .bottom_right = .{ .x = 582.70105, .y = 562.7699 },
-                // };
-                // wall = .{
-                //     .start = .{ .x = 576, .y = 511 },
-                //     .end = .{ .x = 576, .y = 640 },
-                // };
-                // mtv: .{ .x = -5877.5625, .y = 0 }
                 if (i >= 100) {
                     std.log.err("Excessive collisions", .{});
                     if (builtin.mode == .Debug) {

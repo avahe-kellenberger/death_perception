@@ -646,17 +646,6 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
             return null;
         }
 
-        // pub fn determineWalls(_: *Self) std.ArrayList(CollisionShape) {
-        //     var walls: std.ArrayList(CollisionShape) = .empty;
-        //     walls.append(Game.alloc, .{
-        //         .line = .init(
-        //             .init(161, 161),
-        //             .init(161, 240),
-        //         ),
-        //     }) catch unreachable;
-        //     return walls;
-        // }
-
         pub fn determineWalls(self: *Self) std.ArrayList(CollisionShape) {
             var walls: std.ArrayList(CollisionShape) = .empty;
 

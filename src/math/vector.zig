@@ -101,11 +101,11 @@ pub fn Vector(T: type) type {
             return .{ .x = -self.x, .y = -self.y };
         }
 
-        pub fn perpRight(self: Self) Self {
+        pub fn perpLeft(self: Self) Self {
             return .init(self.y, -self.x);
         }
 
-        pub fn perpLeft(self: Self) Self {
+        pub fn perpRight(self: Self) Self {
             return .init(-self.y, self.x);
         }
 

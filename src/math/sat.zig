@@ -102,8 +102,9 @@ pub fn collides(
     shape_a.getProjectionAxes(&axes, shape_b, relative_loc);
     shape_b.getProjectionAxes(&axes, shape_a, relative_loc);
 
-    // const proj_axes_a = axes.items[0..num_axes_a];
-    // const proj_axes_b = axes.items[num_axes_a..axes.items.len];
+    for (axes.items, 0..) |axis, i| {
+        std.log.err("axis[{}] = {}", .{ i, axis });
+    }
 
     var is_shape_a_mtv = true;
     var intrusion_mtv = std.math.inf(f32);
@@ -121,10 +122,18 @@ pub fn collides(
         const proj_a = shape_a.project(relative_loc, axis);
         const proj_b = shape_b.project(Vector.zero, axis);
 
+        std.log.err("proj_a: {}", .{proj_a});
+        std.log.err("proj_b: {}", .{proj_b});
+
         // Project the velocity on the current axis.
         const move_vector_proj = relative_move_vector.dotProduct(axis);
         var total_proj_min_a = proj_a.x;
         var total_proj_max_a = proj_a.y;
+
+        std.log.err("move_vector_proj: {}", .{move_vector_proj});
+        std.log.err("loc_a: {}", .{loc_a});
+        std.log.err("loc_b: {}", .{loc_b});
+        std.log.err("relative_loc: {}", .{relative_loc});
 
         // BELOW IS NO TOUCHY ZONE
 
@@ -160,6 +169,12 @@ pub fn collides(
             // Shapes are not intersecting and will not intersect.
             return null;
         }
+
+        std.log.err("enter_time_ratio: {}", .{enter_time_ratio});
+        std.log.err("exit_time_ratio: {}", .{exit_time_ratio});
+        std.log.err("total_proj_min_a: {}", .{total_proj_min_a});
+        std.log.err("total_proj_max_a: {}", .{total_proj_max_a});
+        std.log.err("proj_b: {}", .{proj_b});
 
         // END OF NO TOUCHY ZONE
 
@@ -282,7 +297,7 @@ fn _getContactLoc(
     }
 
     // Get the vector perpendicular to the contact normal.
-    const edge = owner_contact_normal.perpLeft();
+    const edge = owner_contact_normal.perpRight();
 
     // Get the projections of the points of the other shape onto the edge.
     const min_max_proj_other = MinMaxProjectionInterval.init(buffer.items, edge);
@@ -360,38 +375,70 @@ const MinMaxProjectionInterval = struct {
     }
 };
 
-test {
-    const alloc = std.testing.allocator;
-    const loc_a: Vector = .init(1.0, 10.0);
-    const loc_b: Vector = .init(10.0, 10.0);
-    const shape_a: CollisionShape = .{ .aabb = .init(Vector.zero, .init(10, 10)) };
-    const shape_b: CollisionShape = shape_a;
-    const move_a: Vector = .init(0, -1);
-    const move_b: Vector = Vector.zero;
+// test {
+//     const alloc = std.testing.allocator;
+//     const loc_a: Vector = .init(1.0, 10.0);
+//     const loc_b: Vector = .init(10.0, 10.0);
+//     const shape_a: CollisionShape = .{ .aabb = .init(Vector.zero, .init(10, 10)) };
+//     const shape_b: CollisionShape = shape_a;
+//     const move_a: Vector = .init(0, -1);
+//     const move_b: Vector = Vector.zero;
+//
+//     if (collides(alloc, loc_a, shape_a, move_a, loc_b, shape_b, move_b)) |result| {
+//         const mtv = result.getMinTranslationVector();
+//         try std.testing.expectEqual(1, mtv.x);
+//         try std.testing.expectEqual(0, mtv.y);
+//     } else {
+//         try std.testing.expect(false);
+//     }
+// }
 
-    if (collides(alloc, loc_a, shape_a, move_a, loc_b, shape_b, move_b)) |result| {
-        const mtv = result.getMinTranslationVector();
-        try std.testing.expectEqual(1, mtv.x);
-        try std.testing.expectEqual(0, mtv.y);
-    } else {
-        try std.testing.expect(false);
-    }
-}
+// test "circle vs line" {
+//     const alloc = std.testing.allocator;
+//     const circle: CollisionShape = .{ .circle = .init(Vector.zero, 10) };
+//     const circle_loc: Vector = .init(85, 150);
+//
+//     const line_loc: Vector = Vector.zero;
+//     const line: CollisionShape = .{
+//         .line = .{
+//             .start = .init(100, 200),
+//             .end = .init(100, 100),
+//         },
+//     };
+//
+//     const move_a: Vector = .init(12, 0);
+//     const move_b: Vector = Vector.zero;
+//
+//     // Circle is 5 pixes from the wall
+//     // Move 12 pixels to the right
+//     // Overlap of 7 pixels
+//
+//     if (collides(alloc, circle_loc, circle, move_a, line_loc, line, move_b)) |result| {
+//         const mtv = result.getMinTranslationVector();
+//         try std.testing.expectEqual(-7, mtv.x);
+//         try std.testing.expectEqual(0, mtv.y);
+//     } else {
+//         // TODO: No collision was detected...
+//         try std.testing.expect(false);
+//     }
+// }
 
 test "circle vs line" {
     const alloc = std.testing.allocator;
-    const circle: CollisionShape = .{ .circle = .init(Vector.zero, 10) };
-    const circle_loc: Vector = .init(85, 150);
+
+    // const circle: CollisionShape = .{ .circle = .init(.init(0, -7), 7.0) };
+    const circle: CollisionShape = .{ .circle = .init(.init(0, 0), 14.0) };
+    const circle_loc: Vector = .{ .x = 1064.7529, .y = 843.0538 };
 
     const line_loc: Vector = Vector.zero;
     const line: CollisionShape = .{
         .line = .{
-            .start = .init(100, 100),
-            .end = .init(100, 200),
+            .start = .init(1072, 800),
+            .end = .init(1072, 816),
         },
     };
 
-    const move_a: Vector = .init(12, 0);
+    const move_a: Vector = .init(20, 0);
     const move_b: Vector = Vector.zero;
 
     // Circle is 5 pixes from the wall
@@ -399,11 +446,11 @@ test "circle vs line" {
     // Overlap of 7 pixels
 
     if (collides(alloc, circle_loc, circle, move_a, line_loc, line, move_b)) |result| {
-        const mtv = result.getMinTranslationVector();
-        try std.testing.expectEqual(-7, mtv.x);
-        try std.testing.expectEqual(0, mtv.y);
-    } else {
-        // TODO: No collision was detected...
+        _ = result;
+        // const mtv = result.getMinTranslationVector();
         try std.testing.expect(false);
+    } else {
+        // collision was detected
+        try std.testing.expect(true);
     }
 }

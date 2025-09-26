@@ -45,8 +45,7 @@ pub var bg_color: sdl.pixels.Color = .{};
 pub const scale: f32 = 1.0;
 pub const tile_size: f32 = 16.0 * scale;
 
-// TODO: Make private after testing
-pub var level: Level1 = undefined;
+var level: Level1 = undefined;
 
 pub var is_server: bool = false;
 

@@ -357,59 +357,57 @@ const MinMaxProjectionInterval = struct {
     }
 };
 
-// test {
-//     const alloc = std.testing.allocator;
-//     const loc_a: Vector = .init(1.0, 10.0);
-//     const loc_b: Vector = .init(10.0, 10.0);
-//     const shape_a: CollisionShape = .{ .aabb = .init(Vector.zero, .init(10, 10)) };
-//     const shape_b: CollisionShape = shape_a;
-//     const move_a: Vector = .init(0, -1);
-//     const move_b: Vector = Vector.zero;
-//
-//     if (collides(alloc, loc_a, shape_a, move_a, loc_b, shape_b, move_b)) |result| {
-//         const mtv = result.getMinTranslationVector();
-//         try std.testing.expectEqual(1, mtv.x);
-//         try std.testing.expectEqual(0, mtv.y);
-//     } else {
-//         try std.testing.expect(false);
-//     }
-// }
+test {
+    const alloc = std.testing.allocator;
+    const loc_a: Vector = .init(1.0, 10.0);
+    const loc_b: Vector = .init(10.0, 10.0);
+    const shape_a: CollisionShape = .{ .aabb = .init(Vector.zero, .init(10, 10)) };
+    const shape_b: CollisionShape = shape_a;
+    const move_a: Vector = .init(0, -1);
+    const move_b: Vector = Vector.zero;
 
-// test "circle vs line" {
-//     const alloc = std.testing.allocator;
-//     const circle: CollisionShape = .{ .circle = .init(Vector.zero, 10) };
-//     const circle_loc: Vector = .init(85, 150);
-//
-//     const line_loc: Vector = Vector.zero;
-//     const line: CollisionShape = .{
-//         .line = .{
-//             .start = .init(100, 200),
-//             .end = .init(100, 100),
-//         },
-//     };
-//
-//     const move_a: Vector = .init(12, 0);
-//     const move_b: Vector = Vector.zero;
-//
-//     // Circle is 5 pixes from the wall
-//     // Move 12 pixels to the right
-//     // Overlap of 7 pixels
-//
-//     if (collides(alloc, circle_loc, circle, move_a, line_loc, line, move_b)) |result| {
-//         const mtv = result.getMinTranslationVector();
-//         try std.testing.expectEqual(-7, mtv.x);
-//         try std.testing.expectEqual(0, mtv.y);
-//     } else {
-//         // TODO: No collision was detected...
-//         try std.testing.expect(false);
-//     }
-// }
+    if (collides(alloc, loc_a, shape_a, move_a, loc_b, shape_b, move_b)) |result| {
+        const mtv = result.getMinTranslationVector();
+        try std.testing.expectEqual(1, mtv.x);
+        try std.testing.expectEqual(0, mtv.y);
+    } else {
+        try std.testing.expect(false);
+    }
+}
 
-test "circle vs line" {
+test "circle vs line 1" {
+    const alloc = std.testing.allocator;
+    const circle: CollisionShape = .{ .circle = .init(Vector.zero, 10) };
+    const circle_loc: Vector = .init(85, 150);
+
+    const line_loc: Vector = Vector.zero;
+    const line: CollisionShape = .{
+        .line = .{
+            .start = .init(100, 200),
+            .end = .init(100, 100),
+        },
+    };
+
+    const move_a: Vector = .init(12, 0);
+    const move_b: Vector = Vector.zero;
+
+    // Circle is 5 pixes from the wall
+    // Move 12 pixels to the right
+    // Overlap of 7 pixels
+
+    if (collides(alloc, circle_loc, circle, move_a, line_loc, line, move_b)) |result| {
+        const mtv = result.getMinTranslationVector();
+        try std.testing.expectEqual(-7, mtv.x);
+        try std.testing.expectEqual(0, mtv.y);
+    } else {
+        try std.testing.expect(false);
+    }
+}
+
+test "circle vs line 2" {
     const alloc = std.testing.allocator;
 
     const circle: CollisionShape = .{ .circle = .init(.init(0, -7), 7.0) };
-    // const circle: CollisionShape = .{ .circle = .init(.init(0, 0), 14.0) };
     const circle_loc: Vector = .{ .x = 1064.7529, .y = 843.0538 };
 
     const line_loc: Vector = Vector.zero;
@@ -423,13 +421,8 @@ test "circle vs line" {
     const move_a: Vector = .init(20, 0);
     const move_b: Vector = Vector.zero;
 
-    // Circle is 5 pixes from the wall
-    // Move 12 pixels to the right
-    // Overlap of 7 pixels
-
     if (collides(alloc, circle_loc, circle, move_a, line_loc, line, move_b)) |result| {
         _ = result;
-        // const mtv = result.getMinTranslationVector();
         try std.testing.expect(false);
     } else {
         // collision was detected

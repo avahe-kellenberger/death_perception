@@ -145,6 +145,7 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
         pub fn deinit(self: *Self) void {
             self.walls.deinit(Game.alloc);
             self.walls_spatial_partition.deinit();
+            self.spatial_partition.deinit();
             Game.alloc.destroy(self.tiles);
         }
 
@@ -427,6 +428,7 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
 
             Game.setRenderColor(Color.blue);
             var wall_iter = self.walls_spatial_partition.window(area);
+            defer wall_iter.deinit();
             while (wall_iter.next()) |wall| {
                 wall.render(Vector.zero);
             }
@@ -604,6 +606,10 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                     };
                 }
 
+                pub fn deinit(iter: *CollisionIter) void {
+                    iter.wall_iter.deinit();
+                }
+
                 pub fn next(iter: *CollisionIter) ?CollisionResult {
                     while (iter.wall_iter.next()) |wall| {
                         if (sat.collides(
@@ -616,13 +622,9 @@ pub fn Map(comptime width: usize, comptime height: usize, _tile_size: f32) type 
                             wall.*,
                             Vector.zero,
                         )) |res| {
-                            std.log.err("player: {}", .{T.collision_shape.circle.getBounds().translate(iter.entity.loc)});
-                            std.log.err("wall: {}", .{wall.line});
-                            std.log.err("mtv: {}", .{res.getMinTranslationVector().negate()});
                             return res;
                         }
                     }
-
                     return null;
                 }
             };

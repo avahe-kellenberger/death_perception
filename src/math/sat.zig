@@ -99,12 +99,8 @@ pub fn collides(
     const relative_move_vector = move_vector_a.subtract(move_vector_b);
 
     // Load axes into "axes" list
-    shape_a.getProjectionAxes(&axes, shape_b, relative_loc);
+    shape_a.getProjectionAxes(&axes, shape_b, relative_loc.negate());
     shape_b.getProjectionAxes(&axes, shape_a, relative_loc);
-
-    for (axes.items, 0..) |axis, i| {
-        std.log.err("axis[{}] = {}", .{ i, axis });
-    }
 
     var is_shape_a_mtv = true;
     var intrusion_mtv = std.math.inf(f32);
@@ -122,18 +118,10 @@ pub fn collides(
         const proj_a = shape_a.project(relative_loc, axis);
         const proj_b = shape_b.project(Vector.zero, axis);
 
-        std.log.err("proj_a: {}", .{proj_a});
-        std.log.err("proj_b: {}", .{proj_b});
-
         // Project the velocity on the current axis.
         const move_vector_proj = relative_move_vector.dotProduct(axis);
         var total_proj_min_a = proj_a.x;
         var total_proj_max_a = proj_a.y;
-
-        std.log.err("move_vector_proj: {}", .{move_vector_proj});
-        std.log.err("loc_a: {}", .{loc_a});
-        std.log.err("loc_b: {}", .{loc_b});
-        std.log.err("relative_loc: {}", .{relative_loc});
 
         // BELOW IS NO TOUCHY ZONE
 
@@ -169,12 +157,6 @@ pub fn collides(
             // Shapes are not intersecting and will not intersect.
             return null;
         }
-
-        std.log.err("enter_time_ratio: {}", .{enter_time_ratio});
-        std.log.err("exit_time_ratio: {}", .{exit_time_ratio});
-        std.log.err("total_proj_min_a: {}", .{total_proj_min_a});
-        std.log.err("total_proj_max_a: {}", .{total_proj_max_a});
-        std.log.err("proj_b: {}", .{proj_b});
 
         // END OF NO TOUCHY ZONE
 
@@ -426,8 +408,8 @@ const MinMaxProjectionInterval = struct {
 test "circle vs line" {
     const alloc = std.testing.allocator;
 
-    // const circle: CollisionShape = .{ .circle = .init(.init(0, -7), 7.0) };
-    const circle: CollisionShape = .{ .circle = .init(.init(0, 0), 14.0) };
+    const circle: CollisionShape = .{ .circle = .init(.init(0, -7), 7.0) };
+    // const circle: CollisionShape = .{ .circle = .init(.init(0, 0), 14.0) };
     const circle_loc: Vector = .{ .x = 1064.7529, .y = 843.0538 };
 
     const line_loc: Vector = Vector.zero;

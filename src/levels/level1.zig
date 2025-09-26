@@ -107,6 +107,7 @@ pub const Level1 = struct {
             .player => |*player| {
                 player.update(dt);
                 var iter = Map.CollisionIterator(Player).init(&self.map, player, player.velocity.scale(dt));
+                defer iter.deinit();
                 var mtv: Vector = Vector.zero;
                 var i: u8 = 0;
                 while (iter.next()) |result| {
@@ -115,7 +116,6 @@ pub const Level1 = struct {
                     mtv = mtv.merge(tmp);
                     i += 1;
                     if (i >= 100) break;
-                    unreachable;
                 }
                 if (i >= 100) {
                     std.log.err("Excessive collisions", .{});
@@ -130,6 +130,7 @@ pub const Level1 = struct {
             .bullet => |*bullet| {
                 bullet.update(dt);
                 var iter = Map.CollisionIterator(Bullet).init(&self.map, bullet, bullet.velocity.scale(dt));
+                defer iter.deinit();
                 if (iter.next()) |_| {
                     self.entities_to_remove.append(Game.alloc, kv.key_ptr.*) catch unreachable;
                 }

@@ -52,7 +52,7 @@ pub const CollisionShape = union(enum) {
         to_other: Vector,
     ) void {
         switch (self) {
-            .aabb => for (aabb_projection_axes) |axis| verticies.appendAssumeCapacity(axis),
+            .aabb => verticies.appendSliceAssumeCapacity(&aabb_projection_axes),
             .circle => |circle| switch (other) {
                 .aabb => |aabb| {
                     circleToAABBProjectionAxes(verticies, circle, aabb, to_other);
@@ -315,10 +315,13 @@ fn circleToAABBProjectionAxes(
     aabb: AABB,
     circle_to_aabb: Vector,
 ) void {
+    // Circle center relative to AABB entity location
+    const circle_center = circle.center.subtract(circle_to_aabb);
     for (aabb.verticies()) |v| {
-        list.appendAssumeCapacity(v.subtract(circle.center).add(circle_to_aabb).normalize());
+        list.appendAssumeCapacity(v.subtract(circle_center).normalize());
     }
 }
+
 /// Assumes the provided list has enough capacity to add 2 vectors.
 fn circleToLineProjectionAxes(
     list: *ArrayList(Vector),
@@ -326,6 +329,8 @@ fn circleToLineProjectionAxes(
     line: Line,
     circle_to_line: Vector,
 ) void {
-    list.appendAssumeCapacity(line.start.subtract(circle.center).add(circle_to_line).normalize());
-    list.appendAssumeCapacity(line.end.subtract(circle.center).add(circle_to_line).normalize());
+    // Circle center relative to line entity location
+    const circle_center = circle.center.subtract(circle_to_line);
+    list.appendAssumeCapacity(line.start.subtract(circle_center).normalize());
+    list.appendAssumeCapacity(line.end.subtract(circle_center).normalize());
 }

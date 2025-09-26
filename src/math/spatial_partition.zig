@@ -197,7 +197,6 @@ pub fn SpatialPartition(
                     self.returned_data.put(t, {}) catch unreachable;
                     return t;
                 }
-                self.deinit();
                 return null;
             }
 

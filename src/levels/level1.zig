@@ -50,6 +50,8 @@ pub const Level1 = struct {
     raycast_hit_data: ?TileData = null,
     occlusion_texture: Texture,
 
+    mesh: occlusion.VisibilityMesh,
+
     pub fn init() Level1 {
         // Map floor color so we can ignore drawing "empty" tiles
         Game.bg_color = .{ .r = 139, .g = 155, .b = 180, .a = 255 };
@@ -89,6 +91,7 @@ pub const Level1 = struct {
                 .access = .target,
                 .format = .{ .value = .packed_rgba_8_8_8_8 },
             }) catch unreachable,
+            .mesh = .init(),
         };
     }
 
@@ -99,6 +102,7 @@ pub const Level1 = struct {
         self.map.deinit();
         floor_tiles_image.deinit();
         wall_tiles_image.deinit();
+        self.mesh.deinit();
     }
 
     pub fn update(self: *Self, dt: f32) void {
@@ -195,9 +199,8 @@ pub const Level1 = struct {
             };
         }
 
-        var mesh = occlusion.VisibilityMesh.init(player.loc, self.map.walls.items);
-        defer mesh.deinit();
-        mesh.renderTo(self.occlusion_texture);
+        self.mesh.update(player.loc, self.map.walls.items);
+        self.mesh.renderTo(self.occlusion_texture);
         Game.renderer.renderTexture(self.occlusion_texture, null, null) catch unreachable;
 
         self.map.renderWalls();

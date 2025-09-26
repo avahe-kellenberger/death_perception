@@ -4,7 +4,7 @@ const sdl = @import("sdl3");
 
 const Color = @import("color.zig").Color;
 const Game = @import("game.zig");
-const Line = @import("math/collisionshape.zig").Line;
+const CollisionShape = @import("math/collisionshape.zig").CollisionShape;
 
 const Vector = @import("math/vector.zig").Vector(f32);
 
@@ -12,7 +12,7 @@ const Vector = @import("math/vector.zig").Vector(f32);
 
 const Endpoint = struct {
     point: Vector,
-    wall: *Line,
+    wall: *CollisionShape,
     angle: f32,
     is_start: bool,
 };
@@ -20,37 +20,39 @@ const Endpoint = struct {
 const Endpoints = struct {
     pub const Self = @This();
 
-    items: []Endpoint,
+    items: []Endpoint = &.{},
+    _list: std.ArrayList(Endpoint) = .empty,
 
     /// Find and sort all points by angle to pov
-    pub fn init(pov: Vector, walls: []Line) Self {
-        var items: []Endpoint = Game.alloc.alloc(Endpoint, walls.len * 2) catch unreachable;
+    pub fn update(self: *Self, pov: Vector, walls: []CollisionShape) void {
+        self._list.clearRetainingCapacity();
+        self._list.ensureTotalCapacity(Game.alloc, walls.len * 2) catch unreachable;
 
-        for (walls, 0..) |*wall, i| {
-            const angle_start = wall.start.subtract(pov).getAngleRadians();
-            const angle_end = wall.end.subtract(pov).getAngleRadians();
+        for (walls) |*wall| {
+            const angle_start = wall.line.start.subtract(pov).getAngleRadians();
+            const angle_end = wall.line.end.subtract(pov).getAngleRadians();
             const is_start_first = Vector.getSignedAngleDifference(angle_start, angle_end) > 0.0;
-            items[i * 2] = .{
-                .point = wall.start,
+            self._list.appendAssumeCapacity(.{
+                .point = wall.line.start,
                 .wall = wall,
                 .angle = angle_start,
                 .is_start = is_start_first,
-            };
-            items[i * 2 + 1] = .{
-                .point = wall.end,
+            });
+            self._list.appendAssumeCapacity(.{
+                .point = wall.line.end,
                 .wall = wall,
                 .angle = angle_end,
                 .is_start = !is_start_first,
-            };
+            });
         }
 
-        std.mem.sortUnstable(Endpoint, items, {}, compare);
-
-        return .{ .items = items };
+        self.items = self._list.items;
+        std.mem.sortUnstable(Endpoint, self.items, {}, compare);
     }
 
     pub fn deinit(self: *Self) void {
-        Game.alloc.free(self.items);
+        self._list.deinit(Game.alloc);
+        self.items = &.{};
     }
 
     fn compare(_: void, e1: Endpoint, e2: Endpoint) bool {
@@ -62,47 +64,49 @@ const Endpoints = struct {
 
 const OpenWalls = struct {
     pub const Self = @This();
-    const Heap = std.PriorityQueue(*Line, Vector, compare);
+    const Heap = std.PriorityQueue(*CollisionShape, Vector, compare);
 
     heap: Heap,
 
-    pub fn init(pov: Vector, cap: usize) Self {
-        var heap: Heap = .init(Game.alloc, pov);
-        heap.ensureTotalCapacityPrecise(cap) catch unreachable;
-        return .{
-            .heap = heap,
-        };
+    pub fn init() Self {
+        return .{ .heap = .init(Game.alloc, Vector.zero) };
+    }
+
+    pub fn update(self: *Self, pov: Vector, cap: usize) void {
+        self.heap.clearRetainingCapacity();
+        self.heap.context = pov;
+        self.heap.ensureTotalCapacity(cap) catch unreachable;
     }
 
     pub fn deinit(self: *Self) void {
         self.heap.deinit();
     }
 
-    pub fn nearest(self: *Self) ?*Line {
+    pub fn nearest(self: *Self) ?*CollisionShape {
         return self.heap.peek();
     }
 
-    pub fn add(self: *Self, l: *Line) void {
+    pub fn add(self: *Self, l: *CollisionShape) void {
         self.heap.add(l) catch unreachable;
     }
 
-    pub fn remove(self: *Self, l: *Line) void {
-        const idx = std.mem.indexOfScalar(*Line, self.heap.items, l) orelse return;
+    pub fn remove(self: *Self, l: *CollisionShape) void {
+        const idx = std.mem.indexOfScalar(*CollisionShape, self.heap.items, l) orelse return;
         _ = self.heap.removeIndex(idx);
     }
 
-    fn compare(pov: Vector, l1: *Line, l2: *Line) std.math.Order {
+    fn compare(pov: Vector, l1: *CollisionShape, l2: *CollisionShape) std.math.Order {
         var gap: f32 = 0; // negative, l1 is closer, otherwise l2 is closer
-        gap = absMax(gap, diff(l2, l1.start, pov));
-        gap = absMax(gap, diff(l2, l1.end, pov));
-        gap = absMax(gap, -diff(l1, l2.start, pov));
-        gap = absMax(gap, -diff(l1, l2.end, pov));
+        gap = absMax(gap, diff(l2, l1.line.start, pov));
+        gap = absMax(gap, diff(l2, l1.line.end, pov));
+        gap = absMax(gap, -diff(l1, l2.line.start, pov));
+        gap = absMax(gap, -diff(l1, l2.line.end, pov));
         return std.math.order(gap, 0);
     }
 
-    fn diff(line: *const Line, point: Vector, pov: Vector) f32 {
+    fn diff(shape: *const CollisionShape, point: Vector, pov: Vector) f32 {
         var intersection: Vector = undefined;
-        if (line.findIntersection(pov, point.subtract(pov).normalize(), &intersection)) {
+        if (shape.line.findIntersection(pov, point.subtract(pov).normalize(), &intersection)) {
             return point.distanceSquared(pov) - intersection.distanceSquared(pov);
         }
         return 0;
@@ -116,57 +120,62 @@ const OpenWalls = struct {
 pub const VisibilityMesh = struct {
     pub const Self = @This();
 
+    walls: std.ArrayList(CollisionShape) = .empty,
+    endpoints: Endpoints = .{},
+    open_walls: OpenWalls,
+
     triangle_vertices: std.ArrayList(sdl.render.Vertex) = .empty,
     indices: std.ArrayList(c_int) = .empty,
 
-    pub fn init(pov: Vector, initial_walls: []Line) Self {
-        var mesh: Self = .{};
+    pub fn init() Self {
+        return .{ .open_walls = .init() };
+    }
+
+    pub fn update(self: *Self, pov: Vector, initial_walls: []CollisionShape) void {
+        self.indices.clearRetainingCapacity();
+        self.triangle_vertices.clearRetainingCapacity();
 
         // The POV is always the first vertex of the mesh.
         // This can be referenced using the indices array with index zero.
-        mesh.addVertex(pov);
+        self.addVertex(pov);
 
-        const walls = getWalls(initial_walls);
-        defer Game.alloc.free(walls);
+        self.updateWalls(initial_walls);
+        self.endpoints.update(pov, self.walls.items);
+        self.open_walls.update(pov, self.walls.items.len);
 
-        var endpoints: Endpoints = .init(pov, walls);
-        defer endpoints.deinit();
-
-        var open_walls: OpenWalls = .init(pov, walls.len);
-        defer open_walls.deinit();
-
-        var last_point: *const Endpoint = &endpoints.items[0];
+        var last_point: *const Endpoint = &self.endpoints.items[0];
 
         // A first pass must be performed to calculate inital state of `open_walls` and `last_point`.
         // Triangles are not added to the mesh during this first pass.
         // The `last_point` is the endpoint that forms the first point of the first triangle.
 
         for (0..2) |pass| {
-            for (endpoints.items) |*endpoint| {
-                const closest: ?*Line = open_walls.nearest();
+            for (self.endpoints.items) |*endpoint| {
+                const closest: ?*CollisionShape = self.open_walls.nearest();
 
                 if (endpoint.is_start) {
-                    open_walls.add(endpoint.wall);
+                    self.open_walls.add(endpoint.wall);
                 } else {
-                    open_walls.remove(endpoint.wall);
+                    self.open_walls.remove(endpoint.wall);
                 }
 
-                const new_closest: ?*Line = open_walls.nearest();
+                const new_closest: ?*CollisionShape = self.open_walls.nearest();
                 if (new_closest != closest) {
                     if (pass == 1) {
-                        mesh.addTriangle(pov, last_point, endpoint, closest.?);
+                        self.addTriangle(pov, last_point, endpoint, closest.?);
                     }
                     last_point = endpoint;
                 }
             }
         }
-
-        return mesh;
     }
 
     pub fn deinit(self: *Self) void {
         self.indices.deinit(Game.alloc);
         self.triangle_vertices.deinit(Game.alloc);
+        self.walls.deinit(Game.alloc);
+        self.endpoints.deinit();
+        self.open_walls.deinit();
     }
 
     fn addTriangle(
@@ -174,12 +183,12 @@ pub const VisibilityMesh = struct {
         pov: Vector,
         p1: *const Endpoint,
         p2: *const Endpoint,
-        wall: *const Line,
+        wall: *const CollisionShape,
     ) void {
         var p1i: Vector = undefined;
         var p2i: Vector = undefined;
-        _ = wall.findIntersection(pov, p1.point.subtract(pov).normalize(), &p1i);
-        _ = wall.findIntersection(pov, p2.point.subtract(pov).normalize(), &p2i);
+        _ = wall.line.findIntersection(pov, p1.point.subtract(pov).normalize(), &p1i);
+        _ = wall.line.findIntersection(pov, p2.point.subtract(pov).normalize(), &p2i);
 
         // Reference POV vertex
         self.indices.append(Game.alloc, 0) catch unreachable;
@@ -229,21 +238,21 @@ pub const VisibilityMesh = struct {
         }
     }
 
-    fn cameraWalls() [4]Line {
-        var res: [4]Line = undefined;
+    fn cameraWalls() [4]CollisionShape {
+        var res: [4]CollisionShape = undefined;
         const camera_verts = Game.camera.verticies();
-        res[0] = .init(camera_verts[0], camera_verts[1]);
-        res[1] = .init(camera_verts[1], camera_verts[2]);
-        res[2] = .init(camera_verts[2], camera_verts[3]);
-        res[3] = .init(camera_verts[3], camera_verts[0]);
+        res[0] = .{ .line = .init(camera_verts[0], camera_verts[1]) };
+        res[1] = .{ .line = .init(camera_verts[1], camera_verts[2]) };
+        res[2] = .{ .line = .init(camera_verts[2], camera_verts[3]) };
+        res[3] = .{ .line = .init(camera_verts[3], camera_verts[0]) };
         return res;
     }
 
-    fn getWalls(initial_walls: []Line) []Line {
+    fn updateWalls(self: *Self, initial_walls: []CollisionShape) void {
+        self.walls.clearRetainingCapacity();
         const camera_walls = cameraWalls();
-        var walls = std.ArrayList(Line).initCapacity(Game.alloc, initial_walls.len + camera_walls.len) catch unreachable;
-        walls.appendSliceAssumeCapacity(initial_walls);
-        walls.appendSliceAssumeCapacity(&camera_walls);
-        return walls.toOwnedSlice(Game.alloc) catch unreachable;
+        self.walls.ensureTotalCapacity(Game.alloc, initial_walls.len + camera_walls.len) catch unreachable;
+        self.walls.appendSliceAssumeCapacity(initial_walls);
+        self.walls.appendSliceAssumeCapacity(&camera_walls);
     }
 };

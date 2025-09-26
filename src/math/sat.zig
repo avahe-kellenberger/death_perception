@@ -99,11 +99,8 @@ pub fn collides(
     const relative_move_vector = move_vector_a.subtract(move_vector_b);
 
     // Load axes into "axes" list
-    shape_a.getProjectionAxes(&axes, shape_b, relative_loc);
+    shape_a.getProjectionAxes(&axes, shape_b, relative_loc.negate());
     shape_b.getProjectionAxes(&axes, shape_a, relative_loc);
-
-    // const proj_axes_a = axes.items[0..num_axes_a];
-    // const proj_axes_b = axes.items[num_axes_a..axes.items.len];
 
     var is_shape_a_mtv = true;
     var intrusion_mtv = std.math.inf(f32);
@@ -282,7 +279,7 @@ fn _getContactLoc(
     }
 
     // Get the vector perpendicular to the contact normal.
-    const edge = owner_contact_normal.perpLeft();
+    const edge = owner_contact_normal.perpRight();
 
     // Get the projections of the points of the other shape onto the edge.
     const min_max_proj_other = MinMaxProjectionInterval.init(buffer.items, edge);
@@ -375,5 +372,60 @@ test {
         try std.testing.expectEqual(0, mtv.y);
     } else {
         try std.testing.expect(false);
+    }
+}
+
+test "circle vs line 1" {
+    const alloc = std.testing.allocator;
+    const circle: CollisionShape = .{ .circle = .init(Vector.zero, 10) };
+    const circle_loc: Vector = .init(85, 150);
+
+    const line_loc: Vector = Vector.zero;
+    const line: CollisionShape = .{
+        .line = .{
+            .start = .init(100, 200),
+            .end = .init(100, 100),
+        },
+    };
+
+    const move_a: Vector = .init(12, 0);
+    const move_b: Vector = Vector.zero;
+
+    // Circle is 5 pixes from the wall
+    // Move 12 pixels to the right
+    // Overlap of 7 pixels
+
+    if (collides(alloc, circle_loc, circle, move_a, line_loc, line, move_b)) |result| {
+        const mtv = result.getMinTranslationVector();
+        try std.testing.expectEqual(-7, mtv.x);
+        try std.testing.expectEqual(0, mtv.y);
+    } else {
+        try std.testing.expect(false);
+    }
+}
+
+test "circle vs line 2" {
+    const alloc = std.testing.allocator;
+
+    const circle: CollisionShape = .{ .circle = .init(.init(0, -7), 7.0) };
+    const circle_loc: Vector = .{ .x = 1064.7529, .y = 843.0538 };
+
+    const line_loc: Vector = Vector.zero;
+    const line: CollisionShape = .{
+        .line = .{
+            .start = .init(1072, 800),
+            .end = .init(1072, 816),
+        },
+    };
+
+    const move_a: Vector = .init(20, 0);
+    const move_b: Vector = Vector.zero;
+
+    if (collides(alloc, circle_loc, circle, move_a, line_loc, line, move_b)) |result| {
+        _ = result;
+        try std.testing.expect(false);
+    } else {
+        // collision was detected
+        try std.testing.expect(true);
     }
 }

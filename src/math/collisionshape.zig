@@ -20,6 +20,14 @@ pub const CollisionShape = union(enum) {
     circle: Circle,
     line: Line,
 
+    pub fn getBounds(shape: CollisionShape) AABB {
+        switch (shape) {
+            .aabb => |aabb| return aabb,
+            .circle => |circle| return circle.getBounds(),
+            .line => |line| return line.getBounds(),
+        }
+    }
+
     pub fn getProjectionAxesCount(self: Self, other: Self) u32 {
         switch (self) {
             .aabb => return 2,
@@ -44,7 +52,7 @@ pub const CollisionShape = union(enum) {
         to_other: Vector,
     ) void {
         switch (self) {
-            .aabb => for (aabb_projection_axes) |axis| verticies.appendAssumeCapacity(axis),
+            .aabb => verticies.appendSliceAssumeCapacity(&aabb_projection_axes),
             .circle => |circle| switch (other) {
                 .aabb => |aabb| {
                     circleToAABBProjectionAxes(verticies, circle, aabb, to_other);
@@ -58,7 +66,7 @@ pub const CollisionShape = union(enum) {
                     circleToLineProjectionAxes(verticies, circle, line, to_other);
                 },
             },
-            .line => |line| verticies.appendAssumeCapacity(line.end.subtract(line.start).perpRight()),
+            .line => |line| verticies.appendAssumeCapacity(line.end.subtract(line.start).perpRight().normalize()),
         }
     }
 
@@ -168,6 +176,13 @@ pub const AABB = struct {
         };
     }
 
+    pub fn translate(self: Self, delta: Vector) AABB {
+        return AABB{
+            .top_left = self.top_left.add(delta),
+            .bottom_right = self.bottom_right.add(delta),
+        };
+    }
+
     pub fn render(self: Self, parent_loc: Vector) void {
         Game.drawRect(.{
             .x = self.top_left.x + parent_loc.x,
@@ -186,6 +201,13 @@ pub const Circle = struct {
 
     pub fn init(center: Vector, radius: f32) Circle {
         return Circle{ .center = center, .radius = radius };
+    }
+
+    pub fn getBounds(self: Self) AABB {
+        return AABB{
+            .top_left = .init(self.center.x - self.radius, self.center.y - self.radius),
+            .bottom_right = .init(self.center.x + self.radius, self.center.y + self.radius),
+        };
     }
 
     pub fn render(self: Self, parent_loc: Vector) void {
@@ -214,9 +236,16 @@ pub const Line = struct {
         return self.start.add(self.end).scale(0.5);
     }
 
+    pub fn getBounds(self: Self) AABB {
+        return AABB{
+            .top_left = .init(@min(self.start.x, self.end.x), @min(self.start.y, self.end.y)),
+            .bottom_right = .init(@max(self.start.x, self.end.x), @max(self.start.y, self.end.y)),
+        };
+    }
+
     pub fn findIntersection(self: *const Self, ray_origin: Vector, direction: Vector, out: *Vector) bool {
         const v2 = self.end.subtract(self.start);
-        const v3 = direction.perpLeft();
+        const v3 = direction.perpRight().normalize();
 
         const dot = v2.dotProduct(v3);
         if (dot == 0) {
@@ -286,10 +315,13 @@ fn circleToAABBProjectionAxes(
     aabb: AABB,
     circle_to_aabb: Vector,
 ) void {
+    // Circle center relative to AABB entity location
+    const circle_center = circle.center.subtract(circle_to_aabb);
     for (aabb.verticies()) |v| {
-        list.appendAssumeCapacity(v.subtract(circle.center).add(circle_to_aabb).normalize());
+        list.appendAssumeCapacity(v.subtract(circle_center).normalize());
     }
 }
+
 /// Assumes the provided list has enough capacity to add 2 vectors.
 fn circleToLineProjectionAxes(
     list: *ArrayList(Vector),
@@ -297,6 +329,8 @@ fn circleToLineProjectionAxes(
     line: Line,
     circle_to_line: Vector,
 ) void {
-    list.appendAssumeCapacity(line.start.subtract(circle.center).add(circle_to_line).normalize());
-    list.appendAssumeCapacity(line.end.subtract(circle.center).add(circle_to_line).normalize());
+    // Circle center relative to line entity location
+    const circle_center = circle.center.subtract(circle_to_line);
+    list.appendAssumeCapacity(line.start.subtract(circle_center).normalize());
+    list.appendAssumeCapacity(line.end.subtract(circle_center).normalize());
 }

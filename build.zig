@@ -71,8 +71,10 @@ pub fn build(b: *std.Build) void {
         run_cmd.addArgs(args);
     }
 
+    const filters = b.option([]const []const u8, "filter", "...");
     const exe_tests = b.addTest(.{
         .root_module = exe.root_module,
+        .filters = filters orelse &.{},
     });
 
     const run_exe_tests = b.addRunArtifact(exe_tests);

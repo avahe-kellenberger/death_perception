@@ -57,8 +57,11 @@ pub fn SpatialPartition(
             };
         }
 
-        pub fn get(self: *Self, x: u32, y: u32) ?std.ArrayList(*T) {
-            return self.grid.get(toKey(x, y));
+        pub fn get(self: *Self, x: u32, y: u32) ?[]*T {
+            if (self.grid.get(toKey(x, y))) |list| {
+                return list.items;
+            }
+            return null;
         }
 
         pub fn window(self: *Self, win: ArrayWindow) Iterator {
@@ -142,7 +145,7 @@ pub fn SpatialPartition(
 
             // Pointers of data that have already been returned
             returned_data: std.AutoHashMap(*T, void),
-            current_list: ?std.ArrayList(*T) = null,
+            current_list: ?[]*T = null,
             current_list_i: usize = 0,
 
             pub fn init(self: *Self, win: ArrayWindow) Iterator {
@@ -173,26 +176,26 @@ pub fn SpatialPartition(
                         }
                     }
 
-                    if (self.current_list_i >= self.current_list.?.items.len) {
+                    if (self.current_list_i >= self.current_list.?.len) {
                         self.current_list = null;
                         self.current_list_i = 0;
                         self.advancePosition();
                         continue;
                     }
 
-                    var t: *T = self.current_list.?.items[self.current_list_i];
+                    var t: *T = self.current_list.?[self.current_list_i];
                     defer self.current_list_i += 1;
 
                     while (self.returned_data.contains(t)) {
                         self.current_list_i += 1;
 
-                        if (self.current_list_i >= self.current_list.?.items.len) {
+                        if (self.current_list_i >= self.current_list.?.len) {
                             self.current_list = null;
                             self.current_list_i = 0;
                             self.advancePosition();
                             continue :outer;
                         }
-                        t = self.current_list.?.items[self.current_list_i];
+                        t = self.current_list.?[self.current_list_i];
                     }
                     self.returned_data.put(t, {}) catch unreachable;
                     return t;
